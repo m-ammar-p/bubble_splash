@@ -1,0 +1,135 @@
+import 'dart:math';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../domain/models/achievement.dart';
+import '../domain/models/bubble_skin.dart';
+import '../domain/models/game_result.dart';
+import '../domain/models/player_profile.dart';
+import 'providers.dart';
+
+/// Owns the player's persistent profile and all mutations to it (coins, XP,
+/// stats, skins, achievements). Every mutation persists immediately.
+class ProfileController extends Notifier<PlayerProfile> {
+  @override
+  PlayerProfile build() {
+    final repo = ref.read(profileRepositoryProvider);
+    return repo.load() ?? PlayerProfile.initial(id: _newId());
+  }
+
+  void _commit(PlayerProfile next) {
+    state = next;
+    ref.read(profileRepositoryProvider).save(next);
+  }
+
+  static String _newId() =>
+      'p_${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(99999)}';
+
+  // ---- Rewards / game results --------------------------------------------
+
+  /// Converts a finished round into rewards, updates lifetime stats and
+  /// achievements, and returns a summary for the results screen.
+  RewardSummary recordGameResult(GameResult result) {
+    final coins = result.score ~/ 10 + result.goldenPopped * 20;
+    final xp = result.score;
+    final oldLevel = state.level;
+    final isHigh = result.score > state.highScore;
+
+    var next = state.copyWith(
+      coins: state.coins + coins,
+      xp: state.xp + xp,
+      highScore: max(state.highScore, result.score),
+      gamesPlayed: state.gamesPlayed + 1,
+      totalBubblesPopped: state.totalBubblesPopped + result.bubblesPopped,
+    );
+
+    final newlyUnlocked = _evaluateAchievements(next);
+    if (newlyUnlocked.isNotEmpty) {
+      next = next.copyWith(
+        unlockedAchievementIds: {
+          ...next.unlockedAchievementIds,
+          ...newlyUnlocked,
+        },
+      );
+    }
+    _commit(next);
+
+    return RewardSummary(
+      result: result,
+      coinsEarned: coins,
+      xpEarned: xp,
+      isNewHighScore: isHigh,
+      leveledUp: next.level > oldLevel,
+      newLevel: next.level,
+      unlockedAchievementIds: newlyUnlocked,
+    );
+  }
+
+  /// Grants bonus coins (e.g. the watch-ad-to-double reward on results).
+  void grantCoins(int amount) =>
+      _commit(state.copyWith(coins: state.coins + amount));
+
+  // ---- Daily streak bridge ------------------------------------------------
+
+  /// Records the best daily-reward streak (drives the streak achievement) and
+  /// re-evaluates achievements.
+  void registerStreak(int streak) {
+    var next = state.copyWith(bestStreak: max(state.bestStreak, streak));
+    final newly = _evaluateAchievements(next);
+    if (newly.isNotEmpty) {
+      next = next.copyWith(
+        unlockedAchievementIds: {...next.unlockedAchievementIds, ...newly},
+      );
+    }
+    _commit(next);
+  }
+
+  // ---- Shop ---------------------------------------------------------------
+
+  /// Buys a skin if affordable and not owned. Returns false otherwise.
+  bool buySkin(String skinId) {
+    if (state.ownedSkinIds.contains(skinId)) return false;
+    final skin = skinById(skinId);
+    if (state.coins < skin.price) return false;
+
+    var next = state.copyWith(
+      coins: state.coins - skin.price,
+      ownedSkinIds: {...state.ownedSkinIds, skinId},
+      equippedSkinId: skinId,
+    );
+    final newly = _evaluateAchievements(next);
+    if (newly.isNotEmpty) {
+      next = next.copyWith(
+        unlockedAchievementIds: {...next.unlockedAchievementIds, ...newly},
+      );
+    }
+    _commit(next);
+    return true;
+  }
+
+  void equipSkin(String skinId) {
+    if (!state.ownedSkinIds.contains(skinId)) return;
+    _commit(state.copyWith(equippedSkinId: skinId));
+  }
+
+  // ---- Profile editing ----------------------------------------------------
+
+  void rename(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    _commit(state.copyWith(name: trimmed));
+  }
+
+  void setAvatar({String? emoji, int? color}) =>
+      _commit(state.copyWith(avatarEmoji: emoji, avatarColor: color));
+
+  List<String> _evaluateAchievements(PlayerProfile profile) => [
+        for (final a in kAchievements)
+          if (!profile.unlockedAchievementIds.contains(a.id) &&
+              a.isUnlocked(profile))
+            a.id,
+      ];
+}
+
+final profileControllerProvider =
+    NotifierProvider<ProfileController, PlayerProfile>(ProfileController.new);
