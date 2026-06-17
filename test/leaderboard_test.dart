@@ -22,7 +22,7 @@ void main() {
   test('merges the player, sorts by score, and assigns sequential ranks',
       () async {
     final list =
-        await container.read(leaderboardProvider(LeaderboardScope.national).future);
+        await container.read(leaderboardProvider(LeaderboardScope.local).future);
 
     expect(list, isNotEmpty);
     // Exactly one entry is the current player.
@@ -39,7 +39,7 @@ void main() {
 
   test('a higher player score climbs the ranking', () async {
     final before =
-        await container.read(leaderboardProvider(LeaderboardScope.national).future);
+        await container.read(leaderboardProvider(LeaderboardScope.local).future);
     final myRankBefore = before.firstWhere((e) => e.isCurrentPlayer).rank;
 
     container.read(profileControllerProvider.notifier).recordGameResult(
@@ -48,7 +48,7 @@ void main() {
         );
 
     final after =
-        await container.read(leaderboardProvider(LeaderboardScope.national).future);
+        await container.read(leaderboardProvider(LeaderboardScope.local).future);
     final myEntryAfter = after.firstWhere((e) => e.isCurrentPlayer);
     expect(myEntryAfter.rank, 1);
     expect(myEntryAfter.rank, lessThanOrEqualTo(myRankBefore));

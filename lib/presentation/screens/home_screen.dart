@@ -1,40 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/daily_reward_controller.dart';
+import '../../application/free_life_controller.dart';
 import '../../application/lives_controller.dart';
+import '../../application/providers.dart';
+import '../../domain/models/lives_state.dart';
 import '../../app/routes.dart';
 import '../../app/theme.dart';
 import '../widgets/glass.dart';
-import '../widgets/out_of_lives_sheet.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/status_badges.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
+  // Play is always available — lives are spent only to continue a round.
   void _play(BuildContext context, WidgetRef ref) {
-    if (ref.read(livesControllerProvider.notifier).canPlay) {
-      Navigator.of(context).pushNamed(Routes.game);
-    } else {
-      showOutOfLivesSheet(context);
-    }
+    Navigator.of(context).pushNamed(Routes.game);
   }
 
-  void _claimDaily(BuildContext context, WidgetRef ref) {
-    final reward = ref.read(dailyRewardControllerProvider.notifier).claim();
-    if (reward != null) {
+  Future<void> _claimFreeLife(BuildContext context, WidgetRef ref) async {
+    final earned = await ref.read(rewardedAdServiceProvider).showRewardedAd();
+    if (!earned) return;
+    final ok = ref.read(freeLifeControllerProvider.notifier).claim();
+    if (ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Daily reward: +$reward coins!')),
+        const SnackBar(content: Text('Free life claimed! +1 life')),
       );
     }
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(dailyRewardControllerProvider);
-    final canClaimDaily =
-        ref.read(dailyRewardControllerProvider.notifier).canClaimToday;
+    ref.watch(freeLifeControllerProvider);
+    final lives = ref.watch(livesControllerProvider);
+    ref.watch(livesTickerProvider); // tick the cooldown label
+    final freeLife = ref.read(freeLifeControllerProvider.notifier);
+    final canClaimFreeLife =
+        freeLife.canClaim && lives.count < LivesState.maxLives;
+    final freeLifeUntil = freeLife.untilClaimable();
 
     return Scaffold(
       body: SafeArea(
@@ -84,9 +88,11 @@ class HomeScreen extends ConsumerWidget {
                 style: TextStyle(color: Colors.white54, fontSize: 15),
               ),
               const Spacer(),
-              _DailyRewardCard(
-                canClaim: canClaimDaily,
-                onClaim: () => _claimDaily(context, ref),
+              _FreeLifeCard(
+                canClaim: canClaimFreeLife,
+                livesFull: lives.count >= LivesState.maxLives,
+                until: freeLifeUntil,
+                onClaim: () => _claimFreeLife(context, ref),
               ),
               const SizedBox(height: 20),
               _PulsingPlayButton(
@@ -161,7 +167,8 @@ class _FloatingBubbleState extends State<_FloatingBubble>
         offset: Offset(0, _float.value),
         child: child,
       ),
-      child: const Text('🫧', style: TextStyle(fontSize: 82)),
+      child: const Icon(Icons.bubble_chart,
+          size: 92, color: AppColors.accent),
     );
   }
 }
@@ -237,28 +244,46 @@ class _PulsingPlayButtonState extends State<_PulsingPlayButton>
   }
 }
 
-class _DailyRewardCard extends StatelessWidget {
-  const _DailyRewardCard({required this.canClaim, required this.onClaim});
+/// Watch-ad-for-a-life card. Available every [FreeLifeState.cooldown]; shows a
+/// countdown while cooling down, or "lives full" when the bank is maxed.
+class _FreeLifeCard extends StatelessWidget {
+  const _FreeLifeCard({
+    required this.canClaim,
+    required this.livesFull,
+    required this.until,
+    required this.onClaim,
+  });
 
   final bool canClaim;
+  final bool livesFull;
+  final Duration until;
   final VoidCallback onClaim;
 
   @override
   Widget build(BuildContext context) {
+    final String label;
+    if (livesFull) {
+      label = 'Lives full';
+    } else if (canClaim) {
+      label = 'Watch ad for a free life!';
+    } else {
+      label = 'Free life in ${LivesBadge.formatDuration(until)}';
+    }
+
     return GlassPanel(
       radius: 18,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      tint: canClaim ? AppColors.gold : Colors.white,
-      borderColor: canClaim ? AppColors.gold.withValues(alpha: 0.60) : null,
+      tint: canClaim ? AppColors.heart : Colors.white,
+      borderColor: canClaim ? AppColors.heart.withValues(alpha: 0.60) : null,
       onTap: canClaim ? onClaim : null,
       child: Row(
         children: [
-          Icon(Icons.card_giftcard_rounded,
-              color: canClaim ? AppColors.gold : Colors.white38),
+          Icon(canClaim ? Icons.ondemand_video : Icons.favorite,
+              color: canClaim ? AppColors.heart : Colors.white38),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              canClaim ? 'Claim your daily reward!' : 'Daily reward claimed',
+              label,
               style: TextStyle(
                 color: canClaim ? Colors.white : Colors.white54,
                 fontWeight: FontWeight.w600,

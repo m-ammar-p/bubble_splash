@@ -6,16 +6,17 @@ import '../../domain/repositories/leaderboard_repository.dart';
 /// A simulated remote leaderboard. Generates a deterministic set of competitor
 /// entries (seeded RNG) so the list is stable across launches, with a short
 /// artificial delay to mimic a network round-trip. Global scores skew higher
-/// than national to make the two tabs feel distinct.
+/// than local to make the two tabs feel distinct.
 class FakeLeaderboardRepository implements LeaderboardRepository {
   static const _firstNames = [
     'Aria', 'Liam', 'Noah', 'Mia', 'Zoe', 'Kai', 'Luca', 'Ivy', 'Eli', 'Nova',
     'Remy', 'Sage', 'Theo', 'Wren', 'Juno', 'Otto', 'Cleo', 'Iris', 'Finn',
     'Maya', 'Rex', 'Lux', 'Ada', 'Bo', 'Cy', 'Dex', 'Eve', 'Fox', 'Gia', 'Hugo',
   ];
-  static const _emojis = [
-    '🦊', '🐼', '🐯', '🦁', '🐨', '🐸', '🐙', '🦄', '🐲', '🦖',
-    '🐺', '🦅', '🐝', '🦋', '🐬', '🦈', '🐢', '🦔', '🐱', '🐶',
+  // Avatar keys (see kAvatarIcons) — icons render reliably on every device.
+  static const _avatars = [
+    'bubble', 'rocket', 'star', 'bolt', 'heart',
+    'snow', 'game', 'pet', 'flutter', 'shield',
   ];
   static const _colors = [
     0xFF4FC3F7, 0xFFBA68C8, 0xFFFF8A65, 0xFF81C784,
@@ -45,9 +46,11 @@ class FakeLeaderboardRepository implements LeaderboardRepository {
         LeaderboardEntry(
           id: 'bot_${scope.name}_$i',
           name: name,
-          avatarEmoji: _emojis[rng.nextInt(_emojis.length)],
+          avatarEmoji: _avatars[rng.nextInt(_avatars.length)],
           avatarColor: _colors[rng.nextInt(_colors.length)],
           score: score,
+          // Plausible level scaled from score (matches the XP curve loosely).
+          level: 1 + score ~/ 300,
         ),
       );
     }

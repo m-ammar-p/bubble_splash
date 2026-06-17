@@ -20,19 +20,18 @@ void main() {
   ProfileController profile() =>
       container.read(profileControllerProvider.notifier);
 
-  test('recording a result awards coins/xp and updates stats', () {
+  test('recording a result awards xp and updates stats (no coins from play)',
+      () {
     final summary = profile().recordGameResult(
       const GameResult(
           score: 1000, bubblesPopped: 50, maxCombo: 10, goldenPopped: 2),
     );
 
-    // coins = score~/10 + golden*20 = 100 + 40
-    expect(summary.coinsEarned, 140);
     expect(summary.xpEarned, 1000);
     expect(summary.isNewHighScore, isTrue);
 
     final p = container.read(profileControllerProvider);
-    expect(p.coins, 140);
+    expect(p.coins, 0); // coins are purchased, not earned in-game
     expect(p.highScore, 1000);
     expect(p.gamesPlayed, 1);
     expect(p.totalBubblesPopped, 50);

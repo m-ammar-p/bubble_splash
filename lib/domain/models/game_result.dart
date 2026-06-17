@@ -22,7 +22,6 @@ class GameResult {
 class RewardSummary {
   const RewardSummary({
     required this.result,
-    required this.coinsEarned,
     required this.xpEarned,
     required this.isNewHighScore,
     required this.leveledUp,
@@ -31,7 +30,6 @@ class RewardSummary {
   });
 
   final GameResult result;
-  final int coinsEarned;
   final int xpEarned;
   final bool isNewHighScore;
   final bool leveledUp;

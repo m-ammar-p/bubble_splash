@@ -13,10 +13,6 @@ class GameSessionController {
 
   RewardSummary applyResult(GameResult result) =>
       _ref.read(profileControllerProvider.notifier).recordGameResult(result);
-
-  /// Doubles a round's coin reward (the watch-ad bonus on the results screen).
-  void doubleCoins(RewardSummary summary) =>
-      _ref.read(profileControllerProvider.notifier).grantCoins(summary.coinsEarned);
 }
 
 final gameSessionControllerProvider =

@@ -14,19 +14,35 @@ class BubbleSplashGame extends FlameGame {
   BubbleSplashGame({
     required this.palette,
     required this.onGameOver,
+    required this.onContinueOffer,
     bool soundOn = true,
   }) : soundOn = ValueNotifier(soundOn);
 
   /// Bubble colors, supplied by the equipped skin.
   final List<Color> palette;
 
-  /// Called once when the round ends, with the round's outcome.
+  /// Called once when the round ends for good, with the round's outcome.
   final void Function(GameResult result) onGameOver;
+
+  /// Called when round HP is depleted, before the round ends. The screen offers
+  /// the player a *continue* (spend a banked life / watch an ad). The game is
+  /// paused meanwhile; the screen then calls [continueRound] or [finishRound].
+  final void Function() onContinueOffer;
+
+  /// True while the continue prompt is up: the loop is paused and taps/misses
+  /// are ignored until the player decides.
+  bool _awaitingDecision = false;
 
   final Random _rng = Random();
 
   double _spawnTimer = 0;
   double get _spawnInterval => max(0.32, 0.85 - score.value * 0.01);
+
+  /// Head-start breather after a continue: the screen is cleared and no bubbles
+  /// spawn for this long, but difficulty (spawn speed, derived from score) is
+  /// unchanged. Counts down in [update].
+  static const double headStartSeconds = 3;
+  double _grace = 0;
 
   /// Round HP: missing this many bubbles (or popping a bomb) ends the round.
   static const int maxHp = 3;
@@ -39,6 +55,10 @@ class BubbleSplashGame extends FlameGame {
   final ValueNotifier<int> hp = ValueNotifier<int>(maxHp);
   final ValueNotifier<int> combo = ValueNotifier<int>(0);
   final ValueNotifier<bool> soundOn;
+
+  /// Seconds left in the post-continue head-start (0 when not counting down).
+  /// Drives the on-screen "3·2·1" overlay so the player knows when play resumes.
+  final ValueNotifier<int> headStart = ValueNotifier<int>(0);
 
   bool isGameOver = false;
 
@@ -58,12 +78,19 @@ class BubbleSplashGame extends FlameGame {
   @override
   void update(double dt) {
     super.update(dt);
-    if (isGameOver) return;
+    if (isGameOver || _awaitingDecision) return;
 
-    _spawnTimer += dt;
-    if (_spawnTimer >= _spawnInterval) {
-      _spawnTimer = 0;
-      _spawnBubble();
+    if (_grace > 0) {
+      _grace -= dt; // head-start: hold spawns briefly after a continue
+      final secs = _grace > 0 ? _grace.ceil() : 0;
+      if (headStart.value != secs) headStart.value = secs;
+    } else {
+      if (headStart.value != 0) headStart.value = 0;
+      _spawnTimer += dt;
+      if (_spawnTimer >= _spawnInterval) {
+        _spawnTimer = 0;
+        _spawnBubble();
+      }
     }
 
     if (combo.value > 0) {
@@ -102,12 +129,12 @@ class BubbleSplashGame extends FlameGame {
 
   /// Called by a [Bubble] when the player taps it.
   void onBubblePopped(BubbleKind kind) {
-    if (isGameOver) return;
+    if (isGameOver || _awaitingDecision) return;
 
     if (kind == BubbleKind.bomb) {
-      // Popping a bomb is a mistake — it ends the round immediately.
+      // Popping a bomb is a mistake — it depletes the round (continue offered).
       _play('game_over.wav');
-      _endRound();
+      _offerContinue();
       return;
     }
 
@@ -128,13 +155,45 @@ class BubbleSplashGame extends FlameGame {
   /// Called by a [Bubble] when it floats off the top unpopped. Bombs are safe
   /// to let escape; only missed scoring bubbles cost HP.
   void onBubbleMissed(BubbleKind kind) {
-    if (isGameOver || kind == BubbleKind.bomb) return;
+    if (isGameOver || _awaitingDecision || kind == BubbleKind.bomb) return;
     combo.value = 0;
     hp.value--;
-    if (hp.value <= 0) _endRound();
+    if (hp.value <= 0) _offerContinue();
   }
 
   void toggleSound() => soundOn.value = !soundOn.value;
+
+  /// Round HP depleted: pause the loop and ask the screen for a continue.
+  void _offerContinue() {
+    if (isGameOver || _awaitingDecision) return;
+    _awaitingDecision = true;
+    if (isMounted) pauseEngine(); // guard: no game loop in headless tests
+    onContinueOffer();
+  }
+
+  /// Player spent a life / watched an ad to revive: restore HP, clear the
+  /// screen, and grant a brief head-start before bubbles return. Difficulty
+  /// (spawn speed) is preserved — only the screen is reset.
+  void continueRound() {
+    if (isGameOver || !_awaitingDecision) return;
+    _awaitingDecision = false;
+    hp.value = maxHp;
+    combo.value = 0;
+    for (final bubble in children.whereType<Bubble>().toList()) {
+      bubble.removeFromParent();
+    }
+    _spawnTimer = 0;
+    _grace = headStartSeconds;
+    headStart.value = headStartSeconds.ceil();
+    if (isMounted) resumeEngine();
+  }
+
+  /// Player declined to continue: finalize the round (emits the result).
+  void finishRound() {
+    if (isGameOver) return;
+    _awaitingDecision = false;
+    _endRound();
+  }
 
   late final AudioPool _popPool;
   bool _poolsLoaded = false;

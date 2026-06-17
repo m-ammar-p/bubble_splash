@@ -40,7 +40,7 @@ class PlayerProfile {
   factory PlayerProfile.initial({required String id}) => PlayerProfile(
         id: id,
         name: 'Player',
-        avatarEmoji: '🫧',
+        avatarEmoji: 'bubble',
         avatarColor: 0xFF4FC3F7,
         coins: 0,
         xp: 0,

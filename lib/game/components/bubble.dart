@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../bubble_splash_game.dart';
 import 'pop_effect.dart';
+import 'score_popup.dart';
 
 /// The kind of a bubble, which determines its reward and risk.
 enum BubbleKind {
@@ -144,6 +145,14 @@ class Bubble extends CircleComponent
     event.handled = true;
     game.add(PopEffect(position.clone(), paint.color));
     game.onBubblePopped(kind);
+    // After scoring, surface the live multiplier as a floating "xN" label.
+    if (kind != BubbleKind.bomb && game.multiplier >= 2) {
+      game.add(ScorePopup(
+        position: position.clone(),
+        label: '${game.multiplier}X',
+        color: const Color(0xFFFFD166),
+      ));
+    }
     removeFromParent();
   }
 }

@@ -20,6 +20,7 @@ final leaderboardProvider = FutureProvider.autoDispose
     avatarEmoji: profile.avatarEmoji,
     avatarColor: profile.avatarColor,
     score: profile.highScore,
+    level: profile.level,
     isCurrentPlayer: true,
   );
 

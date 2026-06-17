@@ -1,9 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../domain/models/daily_reward_state.dart';
+import '../../domain/models/free_life_state.dart';
 import '../../domain/models/lives_state.dart';
 import '../../domain/models/player_profile.dart';
-import '../../domain/repositories/daily_reward_repository.dart';
+import '../../domain/repositories/free_life_repository.dart';
 import '../../domain/repositories/lives_repository.dart';
 import '../../domain/repositories/profile_repository.dart';
 
@@ -41,17 +41,17 @@ class PrefsLivesRepository implements LivesRepository {
   void save(LivesState state) => _prefs.setString(_key, state.toJson());
 }
 
-class PrefsDailyRewardRepository implements DailyRewardRepository {
-  PrefsDailyRewardRepository(this._prefs);
+class PrefsFreeLifeRepository implements FreeLifeRepository {
+  PrefsFreeLifeRepository(this._prefs);
   final SharedPreferences _prefs;
-  static const _key = 'daily_reward';
+  static const _key = 'free_life';
 
   @override
-  DailyRewardState? load() {
+  FreeLifeState? load() {
     final raw = _prefs.getString(_key);
-    return raw == null ? null : DailyRewardState.fromJson(raw);
+    return raw == null ? null : FreeLifeState.fromJson(raw);
   }
 
   @override
-  void save(DailyRewardState state) => _prefs.setString(_key, state.toJson());
+  void save(FreeLifeState state) => _prefs.setString(_key, state.toJson());
 }

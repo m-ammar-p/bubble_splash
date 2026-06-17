@@ -63,10 +63,9 @@ class LivesBadge extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final lives = ref.watch(livesControllerProvider);
-    // Rebuild every second so the countdown ticks.
-    ref.watch(livesTickerProvider);
-    final until = ref.read(livesControllerProvider.notifier).untilNextLife();
+    // Just the count — the single regen/claim countdown lives on the Free Life
+    // card, so the lives badge stays clean (no second timer).
+    final count = ref.watch(livesControllerProvider.select((s) => s.count));
 
     return GlassPill(
       child: Row(
@@ -74,16 +73,9 @@ class LivesBadge extends ConsumerWidget {
         children: [
           const Icon(Icons.favorite, color: AppColors.heart, size: 18),
           const SizedBox(width: 6),
-          Text('${lives.count}/${LivesState.maxLives}',
+          Text('$count/${LivesState.maxLives}',
               style: const TextStyle(
                   color: Colors.white, fontWeight: FontWeight.bold)),
-          if (until != null) ...[
-            const SizedBox(width: 8),
-            const Icon(Icons.schedule, color: Colors.white54, size: 14),
-            const SizedBox(width: 3),
-            Text(formatDuration(until),
-                style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          ],
         ],
       ),
     );

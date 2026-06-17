@@ -19,8 +19,7 @@ class Achievement {
   final bool Function(PlayerProfile profile) isUnlocked;
 }
 
-/// The full achievement catalog. Conditions read only from [PlayerProfile]
-/// (note: [PlayerProfile.bestStreak] is maintained by the daily-reward flow).
+/// The full achievement catalog. Conditions read only from [PlayerProfile].
 const List<Achievement> kAchievements = [
   Achievement(
     id: 'first_pop',
@@ -51,11 +50,11 @@ const List<Achievement> kAchievements = [
     isUnlocked: _level5,
   ),
   Achievement(
-    id: 'streak_7',
+    id: 'games_25',
     title: 'Dedicated',
-    description: 'Claim a 7-day reward streak',
+    description: 'Play 25 games',
     iconKey: 'calendar',
-    isUnlocked: _streak7,
+    isUnlocked: _games25,
   ),
   Achievement(
     id: 'collector',
@@ -70,5 +69,5 @@ bool _firstPop(PlayerProfile p) => p.gamesPlayed >= 1;
 bool _score1000(PlayerProfile p) => p.highScore >= 1000;
 bool _pop1000(PlayerProfile p) => p.totalBubblesPopped >= 1000;
 bool _level5(PlayerProfile p) => p.level >= 5;
-bool _streak7(PlayerProfile p) => p.bestStreak >= 7;
+bool _games25(PlayerProfile p) => p.gamesPlayed >= 25;
 bool _collector(PlayerProfile p) => p.ownedSkinIds.length >= 3;

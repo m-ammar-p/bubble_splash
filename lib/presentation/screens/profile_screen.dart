@@ -18,7 +18,6 @@ const Map<String, IconData> _achievementIcons = {
   'palette': Icons.palette,
 };
 
-const _avatarEmojis = ['🫧', '🦊', '🐼', '🐯', '🦄', '🐲', '🐙', '🦅', '🐸', '🐱'];
 const _avatarColors = [
   0xFF4FC3F7, 0xFFBA68C8, 0xFFFF8A65, 0xFF81C784, 0xFFFFD54F, 0xFFF06292
 ];
@@ -39,7 +38,7 @@ class ProfileScreen extends ConsumerWidget {
             child: GestureDetector(
               onTap: () => _editAvatar(context, ref, profile),
               child: PlayerAvatar(
-                emoji: profile.avatarEmoji,
+                iconKey: profile.avatarEmoji,
                 color: profile.avatarColor,
                 size: 96,
               ),
@@ -87,9 +86,9 @@ class ProfileScreen extends ConsumerWidget {
                   label: 'Bubbles',
                   value: '${profile.totalBubblesPopped}'),
               _StatTile(
-                  icon: Icons.local_fire_department,
-                  label: 'Best Streak',
-                  value: '${profile.bestStreak}'),
+                  icon: Icons.military_tech,
+                  label: 'Level',
+                  value: '${profile.level}'),
             ],
           ),
           const SizedBox(height: 24),
@@ -143,14 +142,16 @@ class ProfileScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Wrap(
-              spacing: 8,
+              spacing: 12,
+              runSpacing: 12,
               children: [
-                for (final e in _avatarEmojis)
+                for (final key in kAvatarKeys)
                   GestureDetector(
                     onTap: () => ref
                         .read(profileControllerProvider.notifier)
-                        .setAvatar(emoji: e),
-                    child: Text(e, style: const TextStyle(fontSize: 30)),
+                        .setAvatar(emoji: key),
+                    child: Icon(avatarIconFor(key),
+                        color: Colors.white, size: 30),
                   ),
               ],
             ),

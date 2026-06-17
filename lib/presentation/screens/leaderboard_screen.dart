@@ -15,7 +15,7 @@ class LeaderboardScreen extends ConsumerStatefulWidget {
 }
 
 class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
-  LeaderboardScope _scope = LeaderboardScope.national;
+  LeaderboardScope _scope = LeaderboardScope.local;
 
   @override
   Widget build(BuildContext context) {
@@ -30,9 +30,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
             child: SegmentedButton<LeaderboardScope>(
               segments: const [
                 ButtonSegment(
-                    value: LeaderboardScope.national,
-                    label: Text('National'),
-                    icon: Icon(Icons.flag)),
+                    value: LeaderboardScope.local,
+                    label: Text('Local'),
+                    icon: Icon(Icons.location_on)),
                 ButtonSegment(
                     value: LeaderboardScope.global,
                     label: Text('Global'),
@@ -95,18 +95,32 @@ class _LeaderboardRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             PlayerAvatar(
-                emoji: entry.avatarEmoji, color: entry.avatarColor, size: 38),
+                iconKey: entry.avatarEmoji,
+                color: entry.avatarColor,
+                size: 38),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                me ? '${entry.name} (You)' : entry.name,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: me ? FontWeight.bold : FontWeight.w500,
-                ),
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    me ? '${entry.name} (You)' : entry.name,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: me ? FontWeight.bold : FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Lv ${entry.level}',
+                    style: const TextStyle(
+                        color: Colors.white54, fontSize: 12),
+                  ),
+                ],
               ),
             ),
+            const SizedBox(width: 8),
             Text(
               '${entry.score}',
               style: const TextStyle(

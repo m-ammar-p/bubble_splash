@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../application/game_session_controller.dart';
 import '../../application/profile_controller.dart';
-import '../../application/providers.dart';
 import '../../app/theme.dart';
 import '../../domain/models/achievement.dart';
 import '../../domain/models/game_result.dart';
@@ -11,8 +9,8 @@ import 'glass.dart';
 import 'primary_button.dart';
 
 /// The end-of-round results panel, shown over the game. Slides up and fades in
-/// on entry. Score animates from 0 to the final value. New-high-score runs a
-/// gold shimmer header.
+/// on entry. New-high-score runs a gold shimmer header. (Coins are not earned
+/// in-game — they're a purchasable currency — so only score/XP are shown.)
 class ResultsOverlay extends ConsumerStatefulWidget {
   const ResultsOverlay({
     super.key,
@@ -31,7 +29,6 @@ class ResultsOverlay extends ConsumerStatefulWidget {
 
 class _ResultsOverlayState extends ConsumerState<ResultsOverlay>
     with SingleTickerProviderStateMixin {
-  bool _doubled = false;
   late final AnimationController _entryCtrl;
   late final Animation<Offset> _slide;
   late final Animation<double> _fade;
@@ -114,23 +111,18 @@ class _ResultsOverlayState extends ConsumerState<ResultsOverlay>
                     ),
                   ),
                   const SizedBox(height: 20),
-                  // Score counts up from 0 to the final value
-                  TweenAnimationBuilder<int>(
-                    tween: IntTween(begin: 0, end: s.result.score),
-                    duration: const Duration(milliseconds: 1100),
-                    curve: Curves.easeOut,
-                    builder: (_, value, _) => Text(
-                      '$value',
-                      style: const TextStyle(
-                        color: AppColors.accent,
-                        fontSize: 68,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -2,
-                        shadows: [
-                          Shadow(color: AppColors.accent, blurRadius: 24),
-                          Shadow(color: AppColors.accent, blurRadius: 8),
-                        ],
-                      ),
+                  // Final score, shown directly (no count-up animation).
+                  Text(
+                    '${s.result.score}',
+                    style: const TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 68,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -2,
+                      shadows: [
+                        Shadow(color: AppColors.accent, blurRadius: 24),
+                        Shadow(color: AppColors.accent, blurRadius: 8),
+                      ],
                     ),
                   ),
                   Text(
@@ -144,13 +136,6 @@ class _ResultsOverlayState extends ConsumerState<ResultsOverlay>
                     color: Colors.white.withValues(alpha: 0.10),
                   ),
                   const SizedBox(height: 20),
-                  _RewardRow(
-                    icon: Icons.monetization_on_rounded,
-                    color: AppColors.gold,
-                    label: 'Coins',
-                    value: '+${_doubled ? s.coinsEarned * 2 : s.coinsEarned}',
-                  ),
-                  const SizedBox(height: 8),
                   _RewardRow(
                     icon: Icons.bolt_rounded,
                     color: AppColors.accent,
@@ -176,22 +161,6 @@ class _ResultsOverlayState extends ConsumerState<ResultsOverlay>
                     ),
                   ],
                   const SizedBox(height: 28),
-                  if (!_doubled && s.coinsEarned > 0)
-                    PrimaryButton(
-                      label: 'Double coins (watch ad)',
-                      icon: Icons.ondemand_video_rounded,
-                      onPressed: () async {
-                        final earned = await ref
-                            .read(rewardedAdServiceProvider)
-                            .showRewardedAd();
-                        if (!earned) return;
-                        ref
-                            .read(gameSessionControllerProvider)
-                            .doubleCoins(s);
-                        if (mounted) setState(() => _doubled = true);
-                      },
-                    ),
-                  const SizedBox(height: 12),
                   PrimaryButton(
                     label: 'Play Again',
                     icon: Icons.refresh_rounded,

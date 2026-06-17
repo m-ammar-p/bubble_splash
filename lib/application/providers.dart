@@ -4,13 +4,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/fake/fake_leaderboard_repository.dart';
 import '../data/local/prefs_repositories.dart';
+import '../data/services/fake_purchase_service.dart';
 import '../data/services/fake_rewarded_ad_service.dart';
 import '../data/services/noop_notification_scheduler.dart';
-import '../domain/repositories/daily_reward_repository.dart';
+import '../domain/repositories/free_life_repository.dart';
 import '../domain/repositories/leaderboard_repository.dart';
 import '../domain/repositories/lives_repository.dart';
 import '../domain/repositories/profile_repository.dart';
 import '../domain/services/notification_scheduler.dart';
+import '../domain/services/purchase_service.dart';
 import '../domain/services/rewarded_ad_service.dart';
 
 /// Infrastructure providers. This file is the single place concrete
@@ -40,8 +42,8 @@ final livesRepositoryProvider = Provider<LivesRepository>(
   (ref) => PrefsLivesRepository(ref.watch(sharedPreferencesProvider)),
 );
 
-final dailyRewardRepositoryProvider = Provider<DailyRewardRepository>(
-  (ref) => PrefsDailyRewardRepository(ref.watch(sharedPreferencesProvider)),
+final freeLifeRepositoryProvider = Provider<FreeLifeRepository>(
+  (ref) => PrefsFreeLifeRepository(ref.watch(sharedPreferencesProvider)),
 );
 
 final leaderboardRepositoryProvider =
@@ -51,6 +53,10 @@ final leaderboardRepositoryProvider =
 
 final rewardedAdServiceProvider = Provider<RewardedAdService>(
   (ref) => FakeRewardedAdService(ref.watch(navigatorKeyProvider)),
+);
+
+final purchaseServiceProvider = Provider<PurchaseService>(
+  (ref) => FakePurchaseService(ref.watch(navigatorKeyProvider)),
 );
 
 final notificationSchedulerProvider =

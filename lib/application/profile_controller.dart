@@ -14,8 +14,25 @@ class ProfileController extends Notifier<PlayerProfile> {
   @override
   PlayerProfile build() {
     final repo = ref.read(profileRepositoryProvider);
-    return repo.load() ?? PlayerProfile.initial(id: _newId());
+    final loaded = repo.load();
+    if (loaded != null) return loaded;
+    // Fresh player: give a unique, tagged default name and persist it so the
+    // id (and thus the tag) is stable across launches.
+    final id = _newId();
+    final fresh =
+        PlayerProfile.initial(id: id).copyWith(name: _taggedName('Player', id));
+    repo.save(fresh);
+    return fresh;
   }
+
+  /// A stable 4-digit discriminator derived from the profile id, so player
+  /// names are always unique even when two players pick the same base name
+  /// (Discord-style, e.g. "Ace#0421").
+  static String _tagFor(String id) =>
+      (id.hashCode & 0x7fffffff).remainder(10000).toString().padLeft(4, '0');
+
+  static String _taggedName(String base, String id) =>
+      '$base#${_tagFor(id)}';
 
   void _commit(PlayerProfile next) {
     state = next;
@@ -30,13 +47,13 @@ class ProfileController extends Notifier<PlayerProfile> {
   /// Converts a finished round into rewards, updates lifetime stats and
   /// achievements, and returns a summary for the results screen.
   RewardSummary recordGameResult(GameResult result) {
-    final coins = result.score ~/ 10 + result.goldenPopped * 20;
+    // Coins are no longer earned from play — they're a purchasable currency.
+    // A round grants XP/progression only.
     final xp = result.score;
     final oldLevel = state.level;
     final isHigh = result.score > state.highScore;
 
     var next = state.copyWith(
-      coins: state.coins + coins,
       xp: state.xp + xp,
       highScore: max(state.highScore, result.score),
       gamesPlayed: state.gamesPlayed + 1,
@@ -56,7 +73,6 @@ class ProfileController extends Notifier<PlayerProfile> {
 
     return RewardSummary(
       result: result,
-      coinsEarned: coins,
       xpEarned: xp,
       isNewHighScore: isHigh,
       leveledUp: next.level > oldLevel,
@@ -65,24 +81,9 @@ class ProfileController extends Notifier<PlayerProfile> {
     );
   }
 
-  /// Grants bonus coins (e.g. the watch-ad-to-double reward on results).
+  /// Grants bonus coins (e.g. an IAP purchase or rewarded bonus).
   void grantCoins(int amount) =>
       _commit(state.copyWith(coins: state.coins + amount));
-
-  // ---- Daily streak bridge ------------------------------------------------
-
-  /// Records the best daily-reward streak (drives the streak achievement) and
-  /// re-evaluates achievements.
-  void registerStreak(int streak) {
-    var next = state.copyWith(bestStreak: max(state.bestStreak, streak));
-    final newly = _evaluateAchievements(next);
-    if (newly.isNotEmpty) {
-      next = next.copyWith(
-        unlockedAchievementIds: {...next.unlockedAchievementIds, ...newly},
-      );
-    }
-    _commit(next);
-  }
 
   // ---- Shop ---------------------------------------------------------------
 
@@ -115,9 +116,11 @@ class ProfileController extends Notifier<PlayerProfile> {
   // ---- Profile editing ----------------------------------------------------
 
   void rename(String name) {
-    final trimmed = name.trim();
-    if (trimmed.isEmpty) return;
-    _commit(state.copyWith(name: trimmed));
+    // Drop any existing "#tag" the user typed, then re-append the stable tag so
+    // the name stays unique.
+    final base = name.trim().split('#').first.trim();
+    if (base.isEmpty) return;
+    _commit(state.copyWith(name: _taggedName(base, state.id)));
   }
 
   void setAvatar({String? emoji, int? color}) =>

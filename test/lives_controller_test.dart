@@ -24,13 +24,13 @@ void main() {
       container.read(livesControllerProvider.notifier);
   LivesState state() => container.read(livesControllerProvider);
 
-  test('starts full', () {
-    expect(state().count, LivesState.maxLives);
+  test('starts with the starting lives', () {
+    expect(state().count, LivesState.startingLives);
     expect(notifier().canPlay, isTrue);
   });
 
   test('spending lives reduces the count to zero', () {
-    for (var i = 0; i < LivesState.maxLives; i++) {
+    for (var i = 0; i < LivesState.startingLives; i++) {
       expect(notifier().spendLife(), isTrue);
     }
     expect(state().count, 0);
@@ -40,7 +40,7 @@ void main() {
 
   test('regenerates one life after the interval elapses', () {
     final n = notifier();
-    for (var i = 0; i < LivesState.maxLives; i++) {
+    for (var i = 0; i < LivesState.startingLives; i++) {
       n.spendLife();
     }
     expect(state().count, 0);
@@ -52,7 +52,7 @@ void main() {
 
   test('catches up multiple lives offline but caps at max', () {
     final n = notifier();
-    for (var i = 0; i < LivesState.maxLives; i++) {
+    for (var i = 0; i < LivesState.startingLives; i++) {
       n.spendLife();
     }
     // Far in the future → should refill to the cap, not overflow.
@@ -62,9 +62,19 @@ void main() {
     expect(notifier().untilNextLife(), isNull);
   });
 
+  test('addLife banks above the starting count up to the cap', () {
+    final n = notifier();
+    for (var i = LivesState.startingLives; i < LivesState.maxLives; i++) {
+      n.addLife();
+    }
+    expect(state().count, LivesState.maxLives);
+    n.addLife(); // already full → no overflow
+    expect(state().count, LivesState.maxLives);
+  });
+
   test('countdown shrinks toward the next life', () {
     final n = notifier();
-    n.spendLife(); // 5 -> 4, anchor = now
+    n.spendLife(); // anchor = now
     final initial = n.untilNextLife()!;
     now = now.add(const Duration(minutes: 10));
     final later = n.untilNextLife()!;

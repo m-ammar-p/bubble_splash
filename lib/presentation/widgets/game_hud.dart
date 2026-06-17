@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../application/lives_controller.dart';
 import '../../app/theme.dart';
 import '../../game/bubble_splash_game.dart';
 import 'glass.dart';
@@ -27,6 +29,8 @@ class GameHud extends StatelessWidget {
                   icon: Icons.close_rounded,
                   onTap: onQuit,
                 ),
+                const SizedBox(width: 8),
+                const _LivesIndicator(),
                 const Spacer(),
                 ValueListenableBuilder<int>(
                   valueListenable: game.score,
@@ -140,65 +144,77 @@ class _ComboDisplay extends StatelessWidget {
         final level = (combo ~/ 5).clamp(0, 3);
         final color = _colors[level];
 
-        return TweenAnimationBuilder<double>(
-          key: ValueKey(combo),
-          tween: Tween(begin: 1.28, end: 1.0),
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.elasticOut,
-          builder: (_, scale, child) =>
-              Transform.scale(scale: scale, child: child),
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
-              color: color.withValues(alpha: 0.12),
-              border:
-                  Border.all(color: color.withValues(alpha: 0.50), width: 1.5),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.38),
-                  blurRadius: 18,
-                  spreadRadius: 1,
+        // Static pill — no per-frame scale/shake animation (it caused jank).
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            color: color.withValues(alpha: 0.12),
+            border:
+                Border.all(color: color.withValues(alpha: 0.50), width: 1.5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'COMBO',
+                style: TextStyle(
+                  color: color.withValues(alpha: 0.70),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2.5,
                 ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'COMBO',
-                  style: TextStyle(
-                    color: color.withValues(alpha: 0.70),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2.5,
-                  ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${1 + level}×',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  height: 1.0,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '${1 + level}×',
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    height: 1.0,
-                  ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '·$combo',
+                style: TextStyle(
+                  color: color.withValues(alpha: 0.65),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  '·$combo',
-                  style: TextStyle(
-                    color: color.withValues(alpha: 0.65),
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Banked lives (continues) available to revive a depleted round. Shown in the
+/// game area so the player knows they can keep going.
+class _LivesIndicator extends ConsumerWidget {
+  const _LivesIndicator();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(livesControllerProvider.select((s) => s.count));
+    return GlassPill(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            count > 0 ? Icons.favorite : Icons.favorite_border,
+            color: count > 0 ? AppColors.heart : Colors.white30,
+            size: 18,
+          ),
+          const SizedBox(width: 6),
+          Text('$count',
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 }
