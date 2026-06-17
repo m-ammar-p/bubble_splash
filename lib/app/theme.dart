@@ -1,23 +1,27 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 
-/// Shared visual language — an Apple "Liquid Glass" palette: deep translucent
-/// backdrops, vibrant accents, and frosted surfaces.
 abstract final class AppColors {
-  static const bgTop = Color(0xFF0B2A47);
-  static const bgBottom = Color(0xFF050E18);
-  static const accent = Color(0xFF5AC8FA); // iOS cyan
-  static const accent2 = Color(0xFF2D8CF0);
-  static const gold = Color(0xFFFFD66B);
-  static const heart = Color(0xFFFF6B81);
-  static const surface = Color(0xFF0E3A55);
+  // Deeper, more dramatic dark background
+  static const bgTop = Color(0xFF06101F);
+  static const bgBottom = Color(0xFF020408);
 
-  /// Orb colors that glow behind the frosted glass to give it vibrancy.
-  static const orbBlue = Color(0xFF1E88E5);
-  static const orbPurple = Color(0xFF8E24AA);
-  static const orbCyan = Color(0xFF00BCD4);
-  static const orbPink = Color(0xFFEC407A);
+  // Vivid gaming accents
+  static const accent = Color(0xFF38D4F5);      // electric cyan
+  static const accent2 = Color(0xFF1870C8);     // deep blue
+  static const gold = Color(0xFFFFD166);
+  static const heart = Color(0xFFFF5572);
+  static const surface = Color(0xFF0C3350);
+
+  // Gaming-specific neon colors
+  static const neon = Color(0xFF00FFC8);         // emerald neon — combos
+  static const neonPurple = Color(0xFFBF5FFF);   // violet neon — special effects
+
+  // Orb palette (more saturated)
+  static const orbBlue    = Color(0xFF1565C0);
+  static const orbPurple  = Color(0xFF7B1FA2);
+  static const orbCyan    = Color(0xFF00838F);
+  static const orbPink    = Color(0xFFAD1457);
+  static const orbEmerald = Color(0xFF1B5E20);
 }
 
 ThemeData buildAppTheme() {
@@ -45,13 +49,35 @@ ThemeData buildAppTheme() {
   );
 }
 
-/// Full-screen liquid backdrop: a deep gradient with soft, blurred color orbs
-/// drifting behind everything. The orbs are what make frosted glass surfaces
-/// (which blur whatever is behind them) read as vibrant "liquid glass".
-class LiquidBackground extends StatelessWidget {
+/// Full-screen liquid backdrop with animated, slowly pulsing color orbs.
+/// The animation breathes the orb sizes and intensities over an 8-second cycle,
+/// giving a living, atmospheric feel behind the glass surfaces.
+class LiquidBackground extends StatefulWidget {
   const LiquidBackground({super.key, required this.child});
-
   final Widget child;
+
+  @override
+  State<LiquidBackground> createState() => _LiquidBackgroundState();
+}
+
+class _LiquidBackgroundState extends State<LiquidBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,11 +94,29 @@ class LiquidBackground extends StatelessWidget {
             ),
           ),
         ),
-        const _Orb(color: AppColors.orbBlue, top: -70, left: -50, size: 260),
-        const _Orb(color: AppColors.orbPurple, top: 120, right: -70, size: 230),
-        const _Orb(color: AppColors.orbCyan, bottom: -50, left: -40, size: 280),
-        const _Orb(color: AppColors.orbPink, bottom: 140, right: -60, size: 190),
-        child,
+        // Soft color orbs. These use a RadialGradient (color → transparent)
+        // rather than an ImageFilter.blur: a gradient fill is GPU-cheap and can
+        // animate every frame, whereas a large-sigma gaussian blur recomputed
+        // per frame tanks the frame rate (and also defeats caching of any
+        // BackdropFilter glass rendered on top — e.g. the in-game HUD).
+        RepaintBoundary(
+          child: AnimatedBuilder(
+            animation: _ctrl,
+            builder: (_, _) {
+              final t = _ctrl.value;
+              return Stack(
+                children: [
+                  _Orb(color: AppColors.orbBlue,    top: -120 + t * 20,    left: -120,          size: 520 + t * 60, alpha: 0.55 + t * 0.10),
+                  _Orb(color: AppColors.orbPurple,  top: 80 - t * 20,      right: -140,         size: 460 + t * 50, alpha: 0.50 + t * 0.10),
+                  _Orb(color: AppColors.orbCyan,    bottom: -120 + t * 20, left: -110,          size: 540 + t * 60, alpha: 0.48 + t * 0.08),
+                  _Orb(color: AppColors.orbPink,    bottom: 100 - t * 25,  right: -130,         size: 400 + t * 45, alpha: 0.50 + t * 0.08),
+                  _Orb(color: AppColors.orbEmerald, top: 180 + t * 30,     left: -20 + t * 20,  size: 340 + t * 35, alpha: 0.34 + t * 0.08),
+                ],
+              );
+            },
+          ),
+        ),
+        widget.child,
       ],
     );
   }
@@ -82,6 +126,7 @@ class _Orb extends StatelessWidget {
   const _Orb({
     required this.color,
     required this.size,
+    required this.alpha,
     this.top,
     this.left,
     this.right,
@@ -90,6 +135,7 @@ class _Orb extends StatelessWidget {
 
   final Color color;
   final double size;
+  final double alpha;
   final double? top, left, right, bottom;
 
   @override
@@ -100,14 +146,17 @@ class _Orb extends StatelessWidget {
       right: right,
       bottom: bottom,
       child: IgnorePointer(
-        child: ImageFiltered(
-          imageFilter: ImageFilter.blur(sigmaX: 70, sigmaY: 70),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: color.withValues(alpha: 0.55),
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [
+                color.withValues(alpha: alpha),
+                color.withValues(alpha: 0.0),
+              ],
+              stops: const [0.0, 1.0],
             ),
           ),
         ),

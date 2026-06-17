@@ -43,8 +43,8 @@ class GlassPanel extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                base.withValues(alpha: 0.22),
-                base.withValues(alpha: 0.06),
+                base.withValues(alpha: 0.26),
+                base.withValues(alpha: 0.09),
               ],
             ),
             border: Border.all(
@@ -69,7 +69,7 @@ class GlassPanel extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.white.withValues(alpha: 0.28),
+                          Colors.white.withValues(alpha: 0.40),
                           Colors.white.withValues(alpha: 0.0),
                         ],
                       ),
@@ -92,15 +92,22 @@ class GlassPanel extends StatelessWidget {
     );
 
     if (shadow) {
+      final glowColor = (tint != null && tint != Colors.white) ? tint : null;
       content = DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: r,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.28),
-              blurRadius: 22,
+              color: Colors.black.withValues(alpha: 0.30),
+              blurRadius: 24,
               offset: const Offset(0, 12),
             ),
+            if (glowColor != null)
+              BoxShadow(
+                color: glowColor.withValues(alpha: 0.22),
+                blurRadius: 32,
+                spreadRadius: 2,
+              ),
           ],
         ),
         child: content,

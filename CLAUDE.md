@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Bubble Splash is a Flutter game with a Flame-powered core and a full meta-game around it: a core loop (pop → score → coins/XP → progression), Home/Profile/Leaderboard/Shop/Results screens, and retention hooks (regenerating lives, watch-ad-for-life, daily rewards, achievements, leaderboard). Built with `flame` 1.37 + `flutter_riverpod` 3. Enabled platforms: Android, Windows, web.
+Bubble Splash is a Flutter game with a Flame-powered core and a full meta-game around it: a core loop (pop → score → coins/XP → progression), Home/Profile/Leaderboard/Shop/Results screens, and retention hooks (regenerating lives, watch-ad-for-life, daily rewards, achievements, leaderboard). Built with `flame` 1.37 + `flutter_riverpod` 3. Enabled platforms: Android, iOS, web.
 
 ## Commands
 
 ```bash
 flutter pub get                 # fetch dependencies
-flutter run -d emulator-5554    # run on Android emulator (or -d chrome / -d windows)
+flutter run -d emulator-5554    # run on Android emulator (or -d chrome)
 flutter analyze                 # static analysis (lints from analysis_options.yaml)
 flutter test                    # run all tests
 flutter test --plain-name "popping a bubble increases the score"   # run a single test by name

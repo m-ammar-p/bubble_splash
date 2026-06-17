@@ -136,6 +136,9 @@ class BubbleSplashGame extends FlameGame {
 
   void toggleSound() => soundOn.value = !soundOn.value;
 
+  late final AudioPool _popPool;
+  bool _poolsLoaded = false;
+
   void _endRound() {
     if (isGameOver) return;
     isGameOver = true;
@@ -150,9 +153,13 @@ class BubbleSplashGame extends FlameGame {
   }
 
   void _play(String file) {
-    if (!isMounted || !soundOn.value) return;
+    if (!isMounted || !soundOn.value || !_poolsLoaded) return;
     try {
-      FlameAudio.play(file);
+      if (file == 'pop.wav') {
+        _popPool.start();
+      } else {
+        FlameAudio.play(file);
+      }
     } catch (_) {/* ignore audio failures (e.g. headless) */}
   }
 
@@ -160,6 +167,8 @@ class BubbleSplashGame extends FlameGame {
   Future<void> onLoad() async {
     try {
       await FlameAudio.audioCache.loadAll(['pop.wav', 'game_over.wav']);
+      _popPool = await FlameAudio.createPool('pop.wav', minPlayers: 1, maxPlayers: 5);
+      _poolsLoaded = true;
     } catch (_) {/* no audio backend */}
   }
 }
