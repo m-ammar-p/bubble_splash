@@ -21,13 +21,14 @@ class PopEffect extends PositionComponent {
   Future<void> onLoad() async {
     add(_Flash(color));
     add(_Shockwave(color));
+    const count = 12;
     add(
       ParticleSystemComponent(
         particle: Particle.generate(
-          count: 18,
+          count: count,
           lifespan: 0.62,
           generator: (i) {
-            final angle = (i / 18) * 2 * pi + _rng.nextDouble() * 0.4;
+            final angle = (i / count) * 2 * pi + _rng.nextDouble() * 0.4;
             final speed = 90 + _rng.nextDouble() * 150;
             final dropRadius = 2.0 + _rng.nextDouble() * 3.0;
             return AcceleratedParticle(
@@ -37,15 +38,14 @@ class PopEffect extends PositionComponent {
                 renderer: (canvas, particle) {
                   final p = particle.progress;
                   final fade = (1 - p).clamp(0.0, 1.0);
-                  // Colored additive glow.
+                  // Colored additive glow — plain circle, no per-frame blur
+                  // (gaussian blur here stacked badly during combos).
                   canvas.drawCircle(
                     Offset.zero,
                     dropRadius * 1.9,
                     Paint()
-                      ..color = color.withValues(alpha: fade * 0.6)
-                      ..blendMode = BlendMode.plus
-                      ..maskFilter =
-                          const MaskFilter.blur(BlurStyle.normal, 3),
+                      ..color = color.withValues(alpha: fade * 0.4)
+                      ..blendMode = BlendMode.plus,
                   );
                   // Bright glassy core.
                   canvas.drawCircle(
@@ -85,14 +85,19 @@ class _Flash extends PositionComponent {
   void render(Canvas canvas) {
     final p = (_t / _dur).clamp(0.0, 1.0);
     final r = 14 * (1 + p);
+    // Additive flash, no gaussian blur — soft edge comes from a radial fade.
     canvas.drawCircle(
       Offset.zero,
       r,
       Paint()
-        ..color = Color.lerp(Colors.white, color, p)!
-            .withValues(alpha: (1 - p) * 0.85)
-        ..blendMode = BlendMode.plus
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+        ..shader = RadialGradient(
+          colors: [
+            Color.lerp(Colors.white, color, p)!
+                .withValues(alpha: (1 - p) * 0.85),
+            Color.lerp(Colors.white, color, p)!.withValues(alpha: 0.0),
+          ],
+        ).createShader(Rect.fromCircle(center: Offset.zero, radius: r))
+        ..blendMode = BlendMode.plus,
     );
   }
 }

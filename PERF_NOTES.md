@@ -9,7 +9,7 @@ Root causes found:
 ## Steps
 - [x] 1. Bubble hit area — override `containsLocalPoint` with a min tap radius (~34px).
 - [x] 2. Cache bubble visual to a `ui.Image` once in `onLoad`; `render` blits it. No per-frame blur/shader alloc.
-- [ ] 3. PopEffect — drop per-particle `MaskFilter.blur`, cut count 18→12.
+- [x] 3. PopEffect — drop per-particle `MaskFilter.blur`, cut count 18→12.
 - [ ] 4. HUD/background blur cost during play (BackdropFilter over animating bg) — reduce if still janky.
 - [ ] 5. Verify: `flutter analyze`, `flutter test`, profile-mode `app_time_stats` ~16ms budget; update CLAUDE.md.
 
