@@ -49,6 +49,13 @@ ThemeData buildAppTheme() {
   );
 }
 
+/// While > 0, the animated background freezes its controller. An animating
+/// backdrop forces every `BackdropFilter` on top (the in-game HUD glass) to
+/// re-blur every frame because its cache is invalidated — the main HUD cost
+/// during gameplay. [GameScreen] bumps this for the life of a round so those
+/// blurs can cache; the orbs simply hold still (look preserved).
+final ValueNotifier<int> activeGameplayCount = ValueNotifier<int>(0);
+
 /// Full-screen liquid backdrop with animated, slowly pulsing color orbs.
 /// The animation breathes the orb sizes and intensities over an 8-second cycle,
 /// giving a living, atmospheric feel behind the glass surfaces.
@@ -71,10 +78,22 @@ class _LiquidBackgroundState extends State<LiquidBackground>
       vsync: this,
       duration: const Duration(seconds: 8),
     )..repeat(reverse: true);
+    activeGameplayCount.addListener(_syncAnimation);
+    _syncAnimation();
+  }
+
+  /// Freeze the pulse while a round is on screen so HUD BackdropFilters cache.
+  void _syncAnimation() {
+    if (activeGameplayCount.value > 0) {
+      if (_ctrl.isAnimating) _ctrl.stop();
+    } else if (!_ctrl.isAnimating) {
+      _ctrl.repeat(reverse: true);
+    }
   }
 
   @override
   void dispose() {
+    activeGameplayCount.removeListener(_syncAnimation);
     _ctrl.dispose();
     super.dispose();
   }

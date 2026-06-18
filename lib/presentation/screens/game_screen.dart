@@ -29,10 +29,19 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   @override
   void initState() {
     super.initState();
+    // Freeze the animated background for the life of the round so the HUD's
+    // BackdropFilter glass can cache instead of re-blurring every frame.
+    activeGameplayCount.value++;
     // Defer to after the first frame (avoid building the game during initState).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _startRound();
     });
+  }
+
+  @override
+  void dispose() {
+    activeGameplayCount.value--;
+    super.dispose();
   }
 
   void _startRound() {
