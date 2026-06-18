@@ -13,11 +13,13 @@ Bubble Splash is a Flutter game with a Flame-powered core and a full meta-game a
 ```bash
 flutter pub get                 # fetch dependencies
 flutter run -d emulator-5554    # run on Android emulator (or -d chrome)
+flutter run --profile -d emulator-5554   # profile build — the ONLY valid way to judge fps; watch `app_time_stats` (~16ms budget). Debug overstates jank.
 flutter analyze                 # static analysis (lints from analysis_options.yaml)
 flutter test                    # run all tests
 flutter test --plain-name "popping a bubble increases the score"   # run a single test by name
 dart run tool/gen_audio.dart    # regenerate assets/audio/*.wav sound effects
 adb -s emulator-5554 shell pm clear com.demo.bubble_splash   # wipe saved state (profile/lives/free-life) to verify a fresh install
+adb -s emulator-5554 exec-out screencap -p > shot.png        # headless visual check; `adb shell input tap X Y` drives the UI (screen 1440x3120)
 ```
 
 After changing pure Dart/Flutter code, hot reload (`r` in the `flutter run` session) is enough. Adding a **dependency or asset** requires a full restart (`flutter run` again), not hot reload. All persistent state lives in `SharedPreferences` (keys `profile`/`lives`/`free_life`); `pm clear` (above) is the way to reset to a brand-new-player state for manual verification.
