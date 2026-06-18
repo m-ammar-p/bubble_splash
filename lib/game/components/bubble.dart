@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +45,21 @@ class Bubble extends CircleComponent
   final double speed;
 
   bool _resolved = false;
+
+  /// Minimum tappable radius in logical px. Small bubbles render below the 44px
+  /// touch-target floor and the finger covers them, so the hit zone is expanded
+  /// to at least this (visual size is unchanged).
+  static const double _minHitRadius = 34;
+
+  /// Expand the tap zone beyond the visual radius for small bubbles. Without
+  /// this, a radius-22 bubble has a 44px target the fingertip fully occludes.
+  @override
+  bool containsLocalPoint(Vector2 point) {
+    final hit = max(radius, _minHitRadius);
+    final dx = point.x - radius;
+    final dy = point.y - radius;
+    return dx * dx + dy * dy <= hit * hit;
+  }
 
   @override
   Future<void> onLoad() async {
