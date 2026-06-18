@@ -11,6 +11,6 @@ Root causes found:
 - [x] 2. Cache bubble visual to a `ui.Image` once in `onLoad`; `render` blits it. No per-frame blur/shader alloc.
 - [x] 3. PopEffect — drop per-particle `MaskFilter.blur`, cut count 18→12.
 - [x] 4. HUD/background blur cost during play (BackdropFilter over animating bg) — reduce if still janky.
-- [ ] 5. Verify: `flutter analyze`, `flutter test`, profile-mode `app_time_stats` ~16ms budget; update CLAUDE.md.
+- [x] 5. Verify: `flutter analyze`, `flutter test`, profile-mode `app_time_stats` ~16ms budget; update CLAUDE.md.
 
 Mark a step done by checking it + committing.
