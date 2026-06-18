@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
@@ -61,6 +62,13 @@ class Bubble extends CircleComponent
     return dx * dx + dy * dy <= hit * hit;
   }
 
+  /// The orb's appearance depends only on (radius, color), never on the frame,
+  /// so it is painted once into [_sprite] (an offscreen image, blurs and all)
+  /// and blitted each frame. This removes the per-frame MaskFilter.blur ×3 and
+  /// RadialGradient.createShader allocation that tanked the frame rate.
+  ui.Image? _sprite;
+  double _pad = 0;
+
   @override
   Future<void> onLoad() async {
     if (kind == BubbleKind.bomb) {
@@ -73,11 +81,28 @@ class Bubble extends CircleComponent
         ),
       );
     }
+    await _buildSprite();
   }
 
-  @override
-  void render(Canvas canvas) {
-    final center = Offset(radius, radius);
+  /// Paint the glass orb once into a cached image. The glow halo bleeds past the
+  /// circle, so the image is padded.
+  Future<void> _buildSprite() async {
+    _pad = radius * 0.3;
+    final dim = (radius * 2 + _pad * 2).ceil();
+    final recorder = ui.PictureRecorder();
+    _paintGlass(Canvas(recorder), Offset(radius + _pad, radius + _pad));
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(dim, dim);
+    picture.dispose();
+    if (isRemoving || isRemoved) {
+      image.dispose();
+      return;
+    }
+    _sprite = image;
+  }
+
+  /// Draws the layered glass look centered at [center]. Run once into the cache.
+  void _paintGlass(Canvas canvas, Offset center) {
     final color = paint.color;
 
     // Outer glow halo (subtle, additive) so the orb feels lit.
@@ -141,6 +166,36 @@ class Bubble extends CircleComponent
       radius * 0.08,
       Paint()..color = Colors.white.withValues(alpha: 0.95),
     );
+  }
+
+  @override
+  void render(Canvas canvas) {
+    final sprite = _sprite;
+    if (sprite != null) {
+      final dim = radius * 2 + _pad * 2;
+      canvas.drawImageRect(
+        sprite,
+        Rect.fromLTWH(0, 0, sprite.width.toDouble(), sprite.height.toDouble()),
+        Rect.fromLTWH(-_pad, -_pad, dim, dim),
+        Paint()..filterQuality = FilterQuality.low,
+      );
+      return;
+    }
+    // Until the cached image is ready (~1 frame), draw a cheap flat orb — no
+    // blur, no per-frame shader churn.
+    final center = Offset(radius, radius);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()..color = paint.color.withValues(alpha: 0.5),
+    );
+  }
+
+  @override
+  void onRemove() {
+    _sprite?.dispose();
+    _sprite = null;
+    super.onRemove();
   }
 
   @override
