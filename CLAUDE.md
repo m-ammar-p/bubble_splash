@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Bubble Splash is a Flutter game with a Flame-powered core and a full meta-game around it: a core loop (pop → score → XP → progression), Home/Profile/Leaderboard/Shop/Results screens, and retention hooks (lives-as-continues, watch-ad-for-life, the "Free Life" cooldown reward, achievements, leaderboard). Built with `flame` 1.37 + `flutter_riverpod` 3. Enabled platforms: Android, iOS — both scaffolded (`android/`, `ios/`). iOS was added via `flutter create --platforms=ios .`; iOS bundle id is `com.demo.bubbleSplash` (Android: `com.demo.bubble_splash` — iOS strips the underscore). iOS **compile/run requires macOS + Xcode**; this repo is developed on Windows, so iOS can be scaffolded/committed here but only built on a Mac. Dart code is platform-agnostic (no `Platform.`/`dart:io`/`MethodChannel` branches).
+Bubble Splash is a Flutter game with a Flame-powered core and a full meta-game around it: a core loop (pop → score → XP → progression), Home/Profile/Leaderboard/Shop/Results screens, and retention hooks (lives-as-continues, watch-ad-for-life, the "Free Life" cooldown reward, achievements, leaderboard). Built with `flame` 1.37 + `flutter_riverpod` 3. Enabled platforms: Android, iOS — both scaffolded (`android/`, `ios/`). iOS was added via `flutter create --platforms=ios .`; iOS bundle id is `com.bubblesplash.game` (Android applicationId: `com.bubblesplash.game`). iOS **compile/run requires macOS + Xcode**; this repo is developed on Windows, so iOS can be scaffolded/committed here but only built on a Mac. Dart code is platform-agnostic (no `Platform.`/`dart:io`/`MethodChannel` branches).
 
 **Economy model (important — easy to get wrong, was deliberately changed):** Play is **always free**; lives never gate starting a round. A life is an in-round **continue**: when round HP depletes the player spends a banked life (or watches an ad) to revive. Lives are earned passively (1 per 30 min, timestamp-based) and via the **Free Life** ad claim (`FreeLifeController`, 30-min cooldown), banked up to `LivesState.maxLives` (10). **Coins are NOT earned by playing** — they're a *purchasable* currency (`PurchaseService`, fake impl now / RevenueCat later) spent only on Shop skins. A round grants XP/progression only.
 
@@ -18,7 +18,7 @@ flutter analyze                 # static analysis (lints from analysis_options.y
 flutter test                    # run all tests
 flutter test --plain-name "popping a bubble increases the score"   # run a single test by name
 dart run tool/gen_audio.dart    # regenerate assets/audio/*.wav sound effects
-adb -s emulator-5554 shell pm clear com.demo.bubble_splash   # wipe saved state (profile/lives/free-life) to verify a fresh install
+adb -s emulator-5554 shell pm clear com.bubblesplash.game   # wipe saved state (profile/lives/free-life) to verify a fresh install
 adb -s emulator-5554 exec-out screencap -p > shot.png        # headless visual check; `adb shell input tap X Y` drives the UI (screen 1440x3120)
 ```
 
