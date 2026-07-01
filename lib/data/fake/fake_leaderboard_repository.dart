@@ -42,6 +42,10 @@ class FakeLeaderboardRepository implements LeaderboardRepository {
       if (score < 50) score = 50 + rng.nextInt(50);
       final name =
           '${_firstNames[rng.nextInt(_firstNames.length)]}_${rng.nextInt(99)}';
+      // Lifetime pops loosely track score (a bigger scorer usually played more)
+      // but with heavy jitter, so the two boards rank people differently — a
+      // grinder can sit low on score yet high on pops.
+      final bubblesPopped = score * (6 + rng.nextInt(20)) + rng.nextInt(400);
       entries.add(
         LeaderboardEntry(
           id: 'bot_${scope.name}_$i',
@@ -49,6 +53,7 @@ class FakeLeaderboardRepository implements LeaderboardRepository {
           avatarEmoji: _avatars[rng.nextInt(_avatars.length)],
           avatarColor: _colors[rng.nextInt(_colors.length)],
           score: score,
+          bubblesPopped: bubblesPopped,
           // Plausible level scaled from score (matches the XP curve loosely).
           level: 1 + score ~/ 300,
         ),

@@ -16,17 +16,36 @@ class LeaderboardScreen extends ConsumerStatefulWidget {
 
 class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   LeaderboardScope _scope = LeaderboardScope.local;
+  LeaderboardMetric _metric = LeaderboardMetric.highScore;
 
   @override
   Widget build(BuildContext context) {
-    final entries = ref.watch(leaderboardProvider(_scope));
+    final entries =
+        ref.watch(leaderboardProvider((scope: _scope, metric: _metric)));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Leaderboard')),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: SegmentedButton<LeaderboardMetric>(
+              segments: const [
+                ButtonSegment(
+                    value: LeaderboardMetric.highScore,
+                    label: Text('Top Score'),
+                    icon: Icon(Icons.emoji_events)),
+                ButtonSegment(
+                    value: LeaderboardMetric.totalPops,
+                    label: Text('Total Pops'),
+                    icon: Icon(Icons.bubble_chart)),
+              ],
+              selected: {_metric},
+              onSelectionChanged: (s) => setState(() => _metric = s.first),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: SegmentedButton<LeaderboardScope>(
               segments: const [
                 ButtonSegment(
@@ -54,7 +73,8 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
               data: (list) => ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: list.length,
-                itemBuilder: (_, i) => _LeaderboardRow(entry: list[i]),
+                itemBuilder: (_, i) =>
+                    _LeaderboardRow(entry: list[i], metric: _metric),
               ),
             ),
           ),
@@ -65,8 +85,9 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
 }
 
 class _LeaderboardRow extends StatelessWidget {
-  const _LeaderboardRow({required this.entry});
+  const _LeaderboardRow({required this.entry, required this.metric});
   final LeaderboardEntry entry;
+  final LeaderboardMetric metric;
 
   @override
   Widget build(BuildContext context) {
@@ -121,12 +142,22 @@ class _LeaderboardRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              '${entry.score}',
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${entry.valueFor(metric)}',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16),
+                ),
+                Text(
+                  metric == LeaderboardMetric.highScore ? 'pts' : 'pops',
+                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                ),
+              ],
             ),
           ],
         ),
