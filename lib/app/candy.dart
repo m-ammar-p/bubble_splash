@@ -49,6 +49,8 @@ abstract final class Candy {
   static const livesChip = [heartLight, heart, heartDark];
   static const orangeChip = [orangeLight, orange, orangeDark];
   static const yellowChip = [yellowLight, yellow, yellowDark];
+  static const pinkChip = [pinkLight, pink, pinkDark];
+  static const mintChip = [mintLight, mint, mintDark];
 
   /// Glass surface / border for pills, tiles, cards.
   static Color glass([double alpha = 0.10]) => Colors.white.withValues(alpha: alpha);

@@ -22,6 +22,9 @@ unchecked phase.
 | 03 Get Ready | `_HeadStartOverlay` in `lib/presentation/screens/game_screen.dart` |
 | 04 Keep Going? | `lib/presentation/widgets/continue_round_sheet.dart` |
 | 05 Round Over | `lib/presentation/widgets/results_overlay.dart` |
+| 06 Profile | `lib/presentation/screens/profile_screen.dart` |
+| 07 Pick Avatar | `_AvatarPickerDialog` in `profile_screen.dart` |
+| 08 Edit Name | `_NameDialog` in `profile_screen.dart` |
 | Shared tokens/widgets | `lib/app/candy.dart` (new) |
 
 ## Phases
@@ -68,6 +71,27 @@ unchecked phase.
 - [x] **Phase 6 — verify + docs.** `flutter analyze`, `flutter test`; update `CLAUDE.md`
       (UI no longer "mid-migration"; candy.dart is the shared theme; bubble render recipe
       changed) and tick phases here.
+- [x] **Phase 7 — Screens 06–08 (Profile / Pick Avatar / Edit Name).** Specs live only in
+      the handoff **HTML** (`Bubble Splash Home.dc.html`, screens 06–08) — the handoff README
+      still documents 01–05 only. Full rewrite of `profile_screen.dart`:
+      (06) glass 38px back circle + "Profile" Baloo 2 800 20; 90px glossy bubble avatar in
+      the player's `avatarColor` (white→light→mid→dark radial; exact spec trios for the six
+      swatch colors, HSL +0.20/−0.24 fallback for legacy colors) w/ 30px orange pencil badge
+      (→ 07); tappable name Baloo 2 800 23 (→ 08); XP glass card w/ 10px orange gradient bar
+      + glow; STATS 2×2 glass cards (32px chips: yellow star High Score, violet gamepad
+      Games, pink bubbles Bubbles, mint bolt Level); ACHIEVEMENTS — unlocked amber-tinted
+      (rgba(255,194,77,.12) bg / .5 border, orange chip, gold check circle), locked dim glass
+      + lock chip; all rows from `kAchievements` + `unlockedAchievementIds`.
+      (07) `_AvatarPickerDialog` over rgba(10,5,20,.6) barrier: violet `.96→.98` sheet
+      (`_DialogSheet`), 5-col grid of 46px tiles (glass unselected / glossy colored bubble +
+      white border + glow selected), six 34px glossy swatches (white ring + glow selected),
+      48px orange Done. Selection previews live in dialog state; `setAvatar` fires only on
+      Done. (08) `_NameDialog` at `Alignment(0,-0.5)` so the keyboard never covers it: glass
+      input w/ 2.5px `#FF9D3D` bottom underline, Nunito 800 16, `#FFC24D` caret, live "N/16"
+      counter (max 16), 46px orange Save → `rename()` (unique #tag re-append preserved).
+      Native system keyboard — the mock's drawn keyboard was intentionally not built.
+      `candy.dart` gained `pinkChip`/`mintChip`. Logic/navigation unchanged (`Routes.profile`,
+      `rename`, `setAvatar`).
 
 ## Rules that bit us before (from CLAUDE.md — do not violate)
 
@@ -100,3 +124,9 @@ unchecked phase.
   keep `accent`/`gold`/`surface` + orb palette). `flutter analyze` clean, all 40 tests pass.
   **Still pending before shipping:** manual visual pass of screens 02–05 against the handoff
   (combo pill, bomb art, sheets) on-device.
+- 2026-07-02: **Phase 7 complete — screens 06–08 reskinned** (`profile_screen.dart` rewrite,
+  `candy.dart` +`pinkChip`/`mintChip`). `flutter analyze` clean, all 40 tests pass. Old
+  AlertDialog pickers replaced by Candy dialogs; avatar picker now previews live and persists
+  on Done (was: persisted per tap). `profile_screen.dart` no longer uses `glass.dart`/
+  `theme.dart` — remaining legacy screens: leaderboard, shop. **Pending:** manual visual pass
+  of 06–08 on-device.

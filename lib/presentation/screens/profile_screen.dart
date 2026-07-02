@@ -1,26 +1,66 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/candy.dart';
 import '../../application/profile_controller.dart';
-import '../../app/theme.dart';
 import '../../domain/models/achievement.dart';
 import '../../domain/models/player_profile.dart';
-import '../widgets/glass.dart';
 import '../widgets/player_avatar.dart';
 
 /// Maps an achievement's domain [Achievement.iconKey] to a Material icon.
 const Map<String, IconData> _achievementIcons = {
-  'play': Icons.play_circle,
-  'star': Icons.star,
+  'play': Icons.play_arrow_rounded,
+  'star': Icons.star_rounded,
   'bubble': Icons.bubble_chart,
   'level': Icons.military_tech,
   'calendar': Icons.calendar_month,
   'palette': Icons.palette,
 };
 
-const _avatarColors = [
-  0xFF4FC3F7, 0xFFBA68C8, 0xFFFF8A65, 0xFF81C784, 0xFFFFD54F, 0xFFF06292
+/// The avatar color swatches (spec screen 07). Each stores the mid color on the
+/// profile; light/dark shades for the gloss are looked up in [_shadesFor].
+const _swatchColors = [
+  0xFF3DB6FF, // blue
+  0xFF8A5BFF, // violet
+  0xFFFF9D3D, // orange
+  0xFF4BE0A5, // mint
+  0xFFFFD93D, // yellow
+  0xFFFF6B8B, // pink
 ];
+
+/// Exact light/dark trios from the handoff for the known swatches; arbitrary
+/// (legacy) colors fall back to an HSL derivation, same as the game bubbles.
+const _knownShades = <int, (Color, Color)>{
+  0xFF3DB6FF: (Color(0xFFBFEAFF), Color(0xFF0F6EC2)),
+  0xFF8A5BFF: (Candy.violetLight, Candy.violetDark),
+  0xFFFF9D3D: (Candy.orangeLight, Candy.orangeDark),
+  0xFF4BE0A5: (Candy.mintLight, Candy.mintDark),
+  0xFFFFD93D: (Candy.yellowLight, Candy.yellowDark),
+  0xFFFF6B8B: (Candy.pinkLight, Candy.pinkDark),
+};
+
+(Color light, Color dark) _shadesFor(int colorValue) {
+  final known = _knownShades[colorValue];
+  if (known != null) return known;
+  final hsl = HSLColor.fromColor(Color(colorValue));
+  return (
+    hsl.withLightness((hsl.lightness + 0.20).clamp(0.0, 1.0)).toColor(),
+    hsl.withLightness((hsl.lightness - 0.24).clamp(0.0, 1.0)).toColor(),
+  );
+}
+
+/// The glossy candy-bubble gradient used by the avatar, picker tiles and
+/// swatches: white specular at 34%/26% → light → mid → dark.
+RadialGradient _bubbleGradient(int colorValue) {
+  final mid = Color(colorValue);
+  final (light, dark) = _shadesFor(colorValue);
+  return RadialGradient(
+    center: const Alignment(-0.32, -0.48),
+    radius: 1.0,
+    colors: [Colors.white, light, mid, dark],
+    stops: const [0.0, 0.20, 0.54, 1.0],
+  );
+}
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -28,185 +68,154 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(profileControllerProvider);
+    final s = candyScale(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      body: Stack(
         children: [
-          Center(
-            child: GestureDetector(
-              onTap: () => _editAvatar(context, ref, profile),
-              child: PlayerAvatar(
-                iconKey: profile.avatarEmoji,
-                color: profile.avatarColor,
-                size: 96,
+          const Positioned.fill(child: CandyNebulaBackground()),
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16 * s, 10 * s, 16 * s, 0),
+              child: Column(
+                children: [
+                  const _Header(),
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.only(top: 10 * s, bottom: 20 * s),
+                      children: [
+                        _AvatarBlock(profile: profile),
+                        SizedBox(height: 12 * s),
+                        _XpCard(profile: profile),
+                        SizedBox(height: 13 * s),
+                        const _SectionLabel('STATS'),
+                        SizedBox(height: 8 * s),
+                        _StatsGrid(profile: profile),
+                        SizedBox(height: 13 * s),
+                        const _SectionLabel('ACHIEVEMENTS'),
+                        SizedBox(height: 8 * s),
+                        for (final a in kAchievements)
+                          Padding(
+                            padding: EdgeInsets.only(bottom: 8 * s),
+                            child: _AchievementRow(
+                              achievement: a,
+                              unlocked: profile.unlockedAchievementIds
+                                  .contains(a.id),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          Center(
-            child: TextButton.icon(
-              onPressed: () => _rename(context, ref, profile),
-              icon: const Icon(Icons.edit, size: 16, color: Colors.white54),
-              label: Text(
-                profile.name,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _LevelBar(profile: profile),
-          const SizedBox(height: 24),
-          const Text('Stats',
-              style: TextStyle(
-                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            childAspectRatio: 2.4,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            children: [
-              _StatTile(
-                  icon: Icons.star,
-                  label: 'High Score',
-                  value: '${profile.highScore}'),
-              _StatTile(
-                  icon: Icons.sports_esports,
-                  label: 'Games',
-                  value: '${profile.gamesPlayed}'),
-              _StatTile(
-                  icon: Icons.bubble_chart,
-                  label: 'Bubbles',
-                  value: '${profile.totalBubblesPopped}'),
-              _StatTile(
-                  icon: Icons.military_tech,
-                  label: 'Level',
-                  value: '${profile.level}'),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const Text('Achievements',
-              style: TextStyle(
-                  color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          ...kAchievements.map((a) {
-            final unlocked = profile.unlockedAchievementIds.contains(a.id);
-            return _AchievementTile(achievement: a, unlocked: unlocked);
-          }),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _rename(
-      BuildContext context, WidgetRef ref, PlayerProfile profile) async {
-    final controller = TextEditingController(text: profile.name);
-    final name = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Your name', style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: controller,
-          maxLength: 16,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    if (name != null) ref.read(profileControllerProvider.notifier).rename(name);
-  }
-
-  Future<void> _editAvatar(
-      BuildContext context, WidgetRef ref, PlayerProfile profile) async {
-    await showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Pick an avatar',
-            style: TextStyle(color: Colors.white)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                for (final key in kAvatarKeys)
-                  GestureDetector(
-                    onTap: () => ref
-                        .read(profileControllerProvider.notifier)
-                        .setAvatar(emoji: key),
-                    child: Icon(avatarIconFor(key),
-                        color: Colors.white, size: 30),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final c in _avatarColors)
-                  GestureDetector(
-                    onTap: () => ref
-                        .read(profileControllerProvider.notifier)
-                        .setAvatar(color: c),
-                    child: CircleAvatar(backgroundColor: Color(c), radius: 16),
-                  ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Done')),
         ],
       ),
     );
   }
 }
 
-class _LevelBar extends StatelessWidget {
-  const _LevelBar({required this.profile});
-  final PlayerProfile profile;
+/// Glass back circle · "Profile" title · width-matched spacer.
+class _Header extends StatelessWidget {
+  const _Header();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final s = candyScale(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Level ${profile.level}',
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
-            Text('${profile.xpIntoLevel} / ${profile.xpForLevelSpan} XP',
-                style: const TextStyle(color: Colors.white54, fontSize: 12)),
-          ],
+        CandyGlass(
+          width: 38 * s,
+          height: 38 * s,
+          alignment: Alignment.center,
+          onTap: () => Navigator.pop(context),
+          child: Icon(Icons.arrow_back,
+              size: 17 * s, color: Colors.white.withValues(alpha: 0.85)),
         ),
-        const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: LinearProgressIndicator(
-            value: profile.levelProgress,
-            minHeight: 10,
-            backgroundColor: Colors.white12,
-            color: AppColors.accent,
+        Text('Profile', style: Candy.display(size: 20 * s)),
+        SizedBox(width: 38 * s),
+      ],
+    );
+  }
+}
+
+/// 90px glossy bubble avatar (player's color) with the orange pencil badge
+/// (→ avatar picker) and the tappable name (→ rename dialog).
+class _AvatarBlock extends ConsumerWidget {
+  const _AvatarBlock({required this.profile});
+  final PlayerProfile profile;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = candyScale(context);
+    final mid = Color(profile.avatarColor);
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => showAvatarPicker(context, ref),
+          child: SizedBox(
+            width: 96 * s,
+            height: 94 * s,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 90 * s,
+                  height: 90 * s,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: _bubbleGradient(profile.avatarColor),
+                    boxShadow: [
+                      // 0 12px 30px <color .5>
+                      BoxShadow(
+                          color: mid.withValues(alpha: 0.5),
+                          blurRadius: 30 * s,
+                          offset: Offset(0, 12 * s)),
+                      // inset 5px 5px 12px rgba(255,255,255,.45) — soft sheen.
+                      BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.20),
+                          blurRadius: 6 * s,
+                          spreadRadius: -2 * s,
+                          offset: Offset(-3 * s, -3 * s)),
+                    ],
+                  ),
+                  child: Icon(avatarIconFor(profile.avatarEmoji),
+                      size: 40 * s, color: Colors.white),
+                ),
+                // Orange pencil badge, bottom-right, ringed in the bg violet.
+                Positioned(
+                  right: 3 * s,
+                  bottom: 1 * s,
+                  child: Container(
+                    width: 30 * s,
+                    height: 30 * s,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Candy.orangeCtaTop, Candy.orangeCtaBottom],
+                      ),
+                      border: Border.all(color: Candy.bgMid, width: 2.5 * s),
+                    ),
+                    child:
+                        Icon(Icons.edit, size: 13 * s, color: Candy.ctaInk),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SizedBox(height: 9 * s),
+        GestureDetector(
+          onTap: () => showNameDialog(context, ref),
+          child: Text(
+            profile.name,
+            style: Candy.display(size: 23 * s, color: Colors.white, height: 1),
           ),
         ),
       ],
@@ -214,36 +223,68 @@ class _LevelBar extends StatelessWidget {
   }
 }
 
-class _StatTile extends StatelessWidget {
-  const _StatTile(
-      {required this.icon, required this.label, required this.value});
-  final IconData icon;
-  final String label;
-  final String value;
+/// Glass card: "Level N" + "X / Y XP" + orange gradient progress bar w/ glow.
+class _XpCard extends StatelessWidget {
+  const _XpCard({required this.profile});
+  final PlayerProfile profile;
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      radius: 14,
-      blur: 14,
-      shadow: false,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+    final s = candyScale(context);
+    return CandyGlass(
+      radius: 18 * s,
+      surfaceAlpha: 0.08,
+      borderAlpha: 0.14,
+      padding: EdgeInsets.fromLTRB(14 * s, 11 * s, 14 * s, 13 * s),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: AppColors.accent),
-          const SizedBox(width: 12),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(value,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold)),
-              Text(label,
-                  style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              Text('Level ${profile.level}',
+                  style: Candy.display(size: 15 * s, color: Colors.white)),
+              Text('${profile.xpIntoLevel} / ${profile.xpForLevelSpan} XP',
+                  style: Candy.ui(
+                      size: 12 * s,
+                      weight: FontWeight.w800,
+                      color: const Color(0x99FFE1D2))),
             ],
+          ),
+          SizedBox(height: 8 * s),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              height: 10 * s,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ColoredBox(
+                        color: Colors.white.withValues(alpha: 0.14)),
+                  ),
+                  FractionallySizedBox(
+                    widthFactor: profile.levelProgress.clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        gradient: const LinearGradient(colors: [
+                          Candy.orangeCtaTop,
+                          Candy.orangeCtaBottom,
+                        ]),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Candy.orangeCtaBottom
+                                  .withValues(alpha: 0.7),
+                              blurRadius: 12 * s),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -251,53 +292,563 @@ class _StatTile extends StatelessWidget {
   }
 }
 
-class _AchievementTile extends StatelessWidget {
-  const _AchievementTile(
-      {required this.achievement, required this.unlocked});
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return Text(text,
+        style: Candy.ui(
+            size: 12 * s,
+            weight: FontWeight.w800,
+            letterSpacing: 2.5 * s,
+            color: const Color(0x8CFFE1D2)));
+  }
+}
+
+/// 2×2 stat cards: 32px gradient chip + Baloo value + Nunito label.
+class _StatsGrid extends StatelessWidget {
+  const _StatsGrid({required this.profile});
+  final PlayerProfile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    Widget row(Widget a, Widget b) => Row(children: [
+          Expanded(child: a),
+          SizedBox(width: 8 * s),
+          Expanded(child: b),
+        ]);
+    return Column(
+      children: [
+        row(
+          _StatCard(
+              chip: Candy.yellowChip,
+              icon: Icons.star_rounded,
+              iconColor: const Color(0xFF7A5300),
+              value: '${profile.highScore}',
+              label: 'High Score'),
+          _StatCard(
+              chip: Candy.levelChip,
+              icon: Icons.sports_esports,
+              iconColor: Colors.white,
+              value: '${profile.gamesPlayed}',
+              label: 'Games'),
+        ),
+        SizedBox(height: 8 * s),
+        row(
+          _StatCard(
+              chip: Candy.pinkChip,
+              icon: Icons.bubble_chart,
+              iconColor: Colors.white,
+              value: '${profile.totalBubblesPopped}',
+              label: 'Bubbles'),
+          _StatCard(
+              chip: Candy.mintChip,
+              icon: Icons.bolt,
+              iconColor: Colors.white,
+              value: '${profile.level}',
+              label: 'Level'),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.chip,
+    required this.icon,
+    required this.iconColor,
+    required this.value,
+    required this.label,
+  });
+
+  final List<Color> chip;
+  final IconData icon;
+  final Color iconColor;
+  final String value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return CandyGlass(
+      radius: 16 * s,
+      surfaceAlpha: 0.08,
+      borderAlpha: 0.14,
+      padding: EdgeInsets.symmetric(horizontal: 11 * s, vertical: 10 * s),
+      child: Row(
+        children: [
+          CandyChip(
+            colors: chip,
+            size: 32 * s,
+            child: Icon(icon, size: 16 * s, color: iconColor),
+          ),
+          SizedBox(width: 9 * s),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(value,
+                      style: Candy.display(
+                          size: 19 * s, color: Colors.white, height: 1)),
+                ),
+                SizedBox(height: 1 * s),
+                Text(label,
+                    style: Candy.ui(
+                        size: 11 * s,
+                        color: Colors.white.withValues(alpha: 0.55))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Achievement row: amber-tinted with orange chip + gold check when unlocked,
+/// dim glass with a lock chip when locked.
+class _AchievementRow extends StatelessWidget {
+  const _AchievementRow({required this.achievement, required this.unlocked});
   final Achievement achievement;
   final bool unlocked;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: GlassPanel(
-        radius: 14,
-        blur: 14,
-        shadow: false,
-        tint: unlocked ? AppColors.gold : Colors.white,
-        borderColor:
-            unlocked ? AppColors.gold.withValues(alpha: 0.5) : null,
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Icon(
-              unlocked
-                  ? (_achievementIcons[achievement.iconKey] ??
-                      Icons.emoji_events)
-                  : Icons.lock,
-              color: unlocked ? AppColors.gold : Colors.white38,
+    final s = candyScale(context);
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 10 * s),
+      decoration: BoxDecoration(
+        color: unlocked
+            ? const Color(0x1FFFC24D) // rgba(255,194,77,.12)
+            : Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16 * s),
+        border: Border.all(
+          color: unlocked
+              ? const Color(0x80FFC24D) // rgba(255,194,77,.5)
+              : Colors.white.withValues(alpha: 0.12),
+        ),
+        boxShadow: unlocked
+            ? [
+                BoxShadow(
+                    color: Candy.orange.withValues(alpha: 0.15),
+                    blurRadius: 16 * s),
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          if (unlocked)
+            CandyChip(
+              colors: Candy.orangeChip,
+              size: 34 * s,
+              child: Icon(
+                  _achievementIcons[achievement.iconKey] ?? Icons.emoji_events,
+                  size: 17 * s,
+                  color: Candy.ctaInk),
+            )
+          else
+            Container(
+              width: 34 * s,
+              height: 34 * s,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.10),
+              ),
+              child: Icon(Icons.lock,
+                  size: 15 * s, color: Colors.white.withValues(alpha: 0.5)),
             ),
-          const SizedBox(width: 14),
+          SizedBox(width: 10 * s),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(achievement.title,
-                    style: TextStyle(
-                        color: unlocked ? Colors.white : Colors.white54,
-                        fontWeight: FontWeight.bold)),
+                    style: Candy.ui(
+                        size: 14 * s,
+                        weight: FontWeight.w800,
+                        color: unlocked
+                            ? Candy.titleText
+                            : Colors.white.withValues(alpha: 0.75))),
+                SizedBox(height: 1 * s),
                 Text(achievement.description,
-                    style:
-                        const TextStyle(color: Colors.white54, fontSize: 12)),
+                    style: Candy.ui(
+                        size: 11.5 * s,
+                        color: unlocked
+                            ? const Color(0x99FFE1D2)
+                            : Colors.white.withValues(alpha: 0.42))),
               ],
             ),
           ),
-            if (unlocked)
-              const Icon(Icons.check_circle, color: AppColors.gold, size: 20),
+          if (unlocked) ...[
+            SizedBox(width: 10 * s),
+            Container(
+              width: 22 * s,
+              height: 22 * s,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Candy.orangeCtaTop, Candy.orangeCtaBottom],
+                ),
+              ),
+              child: Icon(Icons.check, size: 14 * s, color: Candy.ctaInk),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Screen 07 — Pick an avatar (dialog)
+// ---------------------------------------------------------------------------
+
+Future<void> showAvatarPicker(BuildContext context, WidgetRef ref) {
+  final profile = ref.read(profileControllerProvider);
+  return showDialog<void>(
+    context: context,
+    barrierColor: const Color(0x990A0514), // rgba(10,5,20,.6)
+    builder: (_) => _AvatarPickerDialog(
+      initialKey: profile.avatarEmoji,
+      initialColor: profile.avatarColor,
+      onDone: (key, color) => ref
+          .read(profileControllerProvider.notifier)
+          .setAvatar(emoji: key, color: color),
+    ),
+  );
+}
+
+class _AvatarPickerDialog extends StatefulWidget {
+  const _AvatarPickerDialog({
+    required this.initialKey,
+    required this.initialColor,
+    required this.onDone,
+  });
+
+  final String initialKey;
+  final int initialColor;
+  final void Function(String key, int color) onDone;
+
+  @override
+  State<_AvatarPickerDialog> createState() => _AvatarPickerDialogState();
+}
+
+class _AvatarPickerDialogState extends State<_AvatarPickerDialog> {
+  late String _key = widget.initialKey;
+  late int _color = widget.initialColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(horizontal: 18 * s),
+      child: _DialogSheet(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Pick an avatar', style: Candy.display(size: 22 * s)),
+            SizedBox(height: 14 * s),
+            GridView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                mainAxisExtent: 46 * s,
+                crossAxisSpacing: 8 * s,
+                mainAxisSpacing: 8 * s,
+              ),
+              children: [
+                for (final key in kAvatarKeys)
+                  _AvatarTile(
+                    icon: avatarIconFor(key),
+                    color: _color,
+                    selected: key == _key,
+                    onTap: () => setState(() => _key = key),
+                  ),
+              ],
+            ),
+            SizedBox(height: 16 * s),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (final c in _swatchColors)
+                  _ColorSwatch(
+                    color: c,
+                    selected: c == _color,
+                    onTap: () => setState(() => _color = c),
+                  ),
+              ],
+            ),
+            SizedBox(height: 18 * s),
+            CandyCtaButton(
+              height: 48,
+              radius: 16,
+              onPressed: () {
+                widget.onDone(_key, _color);
+                Navigator.pop(context);
+              },
+              child: Text('Done',
+                  style: Candy.display(
+                      size: 18 * s, color: Candy.ctaInk, letterSpacing: 1)),
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 46px icon tile: glass when unselected; glossy colored bubble + white border
+/// + glow when selected.
+class _AvatarTile extends StatelessWidget {
+  const _AvatarTile({
+    required this.icon,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final int color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        alignment: Alignment.center,
+        decoration: selected
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(14 * s),
+                gradient: _bubbleGradient(color),
+                border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    width: 1.5 * s),
+                boxShadow: [
+                  BoxShadow(
+                      color: Color(color).withValues(alpha: 0.5),
+                      blurRadius: 16 * s,
+                      offset: Offset(0, 6 * s)),
+                ],
+              )
+            : BoxDecoration(
+                borderRadius: BorderRadius.circular(14 * s),
+                color: Candy.glass(0.08),
+                border: Border.all(color: Candy.glassBorder(0.14)),
+              ),
+        child: Icon(icon,
+            size: (selected ? 21 : 20) * s,
+            color: selected
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.85)),
+      ),
+    );
+  }
+}
+
+/// 34px glossy color swatch; selected gets a white ring + glow.
+class _ColorSwatch extends StatelessWidget {
+  const _ColorSwatch({
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final int color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 34 * s,
+        height: 34 * s,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: _bubbleGradient(color),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      spreadRadius: 2.5 * s),
+                  BoxShadow(
+                      color: Color(color).withValues(alpha: 0.6),
+                      blurRadius: 14 * s,
+                      spreadRadius: 2 * s),
+                ]
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Screen 08 — Your name (dialog, native keyboard)
+// ---------------------------------------------------------------------------
+
+Future<void> showNameDialog(BuildContext context, WidgetRef ref) {
+  final profile = ref.read(profileControllerProvider);
+  return showDialog<void>(
+    context: context,
+    barrierColor: const Color(0x990A0514),
+    builder: (_) => _NameDialog(
+      initialName: profile.name,
+      onSave: (name) =>
+          ref.read(profileControllerProvider.notifier).rename(name),
+    ),
+  );
+}
+
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({required this.initialName, required this.onSave});
+
+  final String initialName;
+  final void Function(String name) onSave;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  static const _maxLength = 16;
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initialName);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      // Upper-middle so the system keyboard never covers the dialog.
+      alignment: const Alignment(0, -0.5),
+      insetPadding: EdgeInsets.symmetric(horizontal: 24 * s),
+      child: _DialogSheet(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Your name', style: Candy.display(size: 22 * s)),
+            SizedBox(height: 14 * s),
+            Container(
+              padding:
+                  EdgeInsets.symmetric(horizontal: 14 * s, vertical: 4 * s),
+              decoration: BoxDecoration(
+                color: Candy.glass(0.08),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(14 * s),
+                  topRight: Radius.circular(14 * s),
+                  bottomLeft: Radius.circular(6 * s),
+                  bottomRight: Radius.circular(6 * s),
+                ),
+                border: Border.all(color: Candy.glassBorder(0.16)),
+              ),
+              // Orange focus underline (2.5px solid #FF9D3D).
+              child: Container(
+                decoration: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Candy.orange, width: 2.5),
+                  ),
+                ),
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  maxLength: _maxLength,
+                  cursorColor: Candy.orangeCtaTop,
+                  cursorWidth: 2 * s,
+                  style: Candy.ui(size: 16 * s, weight: FontWeight.w800),
+                  decoration: const InputDecoration(
+                    counterText: '',
+                    border: InputBorder.none,
+                    isDense: true,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _save(),
+                ),
+              ),
+            ),
+            SizedBox(height: 6 * s),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('${_controller.text.length}/$_maxLength',
+                  style: Candy.ui(
+                      size: 11 * s,
+                      color: Colors.white.withValues(alpha: 0.45))),
+            ),
+            SizedBox(height: 12 * s),
+            CandyCtaButton(
+              height: 46,
+              radius: 16,
+              onPressed: _save,
+              child: Text('Save',
+                  style: Candy.display(
+                      size: 18 * s, color: Candy.ctaInk, letterSpacing: 1)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _save() {
+    widget.onSave(_controller.text);
+    Navigator.pop(context);
+  }
+}
+
+/// The violet dialog surface shared by screens 07/08 — like [CandySheet] but
+/// with the dialog-strength gradient (`.96 → .98`).
+class _DialogSheet extends StatelessWidget {
+  const _DialogSheet({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return Container(
+      padding: EdgeInsets.fromLTRB(18 * s, 20 * s, 18 * s, 18 * s),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26 * s),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xF548266E), Color(0xFA22103C)],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.55),
+              blurRadius: 60 * s,
+              offset: Offset(0, 24 * s)),
+        ],
+      ),
+      child: child,
     );
   }
 }
