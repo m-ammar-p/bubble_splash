@@ -130,3 +130,7 @@ unchecked phase.
   on Done (was: persisted per tap). `profile_screen.dart` no longer uses `glass.dart`/
   `theme.dart` — remaining legacy screens: leaderboard, shop. **Pending:** manual visual pass
   of 06–08 on-device.
+- 2026-07-02: **Profile XP bar fix.** Empty track wasn't rendering — the fill
+  `FractionallySizedBox` had no `heightFactor` (collapsed to 0) and `ClipRRect` clipped the
+  glow. Now an explicit 10px white-.14 track Container with a left-aligned `heightFactor:1`
+  orange fill and un-clipped glow (matches spec box-shadow). `flutter analyze` clean.

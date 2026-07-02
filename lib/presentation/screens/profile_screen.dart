@@ -254,35 +254,35 @@ class _XpCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: 8 * s),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: SizedBox(
-              height: 10 * s,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: ColoredBox(
-                        color: Colors.white.withValues(alpha: 0.14)),
+          // Track (empty area) with the orange fill left-aligned on top. The
+          // fill fills the full 10px height (heightFactor:1) and its glow is
+          // intentionally not clipped, matching the spec's box-shadow.
+          Container(
+            height: 10 * s,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: profile.levelProgress.clamp(0.0, 1.0),
+                heightFactor: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    gradient: const LinearGradient(colors: [
+                      Candy.orangeCtaTop,
+                      Candy.orangeCtaBottom,
+                    ]),
+                    boxShadow: [
+                      BoxShadow(
+                          color:
+                              Candy.orangeCtaBottom.withValues(alpha: 0.7),
+                          blurRadius: 12 * s),
+                    ],
                   ),
-                  FractionallySizedBox(
-                    widthFactor: profile.levelProgress.clamp(0.0, 1.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(999),
-                        gradient: const LinearGradient(colors: [
-                          Candy.orangeCtaTop,
-                          Candy.orangeCtaBottom,
-                        ]),
-                        boxShadow: [
-                          BoxShadow(
-                              color: Candy.orangeCtaBottom
-                                  .withValues(alpha: 0.7),
-                              blurRadius: 12 * s),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
