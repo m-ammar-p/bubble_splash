@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/profile_controller.dart';
-import '../../app/theme.dart';
+import '../../app/candy.dart';
 import '../../domain/models/achievement.dart';
 import '../../domain/models/game_result.dart';
-import 'glass.dart';
-import 'primary_button.dart';
 
 /// The end-of-round results panel, shown over the game. Slides up and fades in
-/// on entry. New-high-score runs a gold shimmer header. (Coins are not earned
-/// in-game — they're a purchasable currency — so only score/XP are shown.)
+/// on entry. Candy Cosmos style (spec screen 05): violet result card, glowing
+/// Baloo 2 score, gradient-chip reward rows, orange PLAY AGAIN. New-high-score
+/// runs a gold shimmer header. (Coins are not earned in-game — they're a
+/// purchasable currency — so only score/XP are shown.)
 class ResultsOverlay extends ConsumerStatefulWidget {
   const ResultsOverlay({
     super.key,
@@ -55,6 +55,7 @@ class _ResultsOverlayState extends ConsumerState<ResultsOverlay>
   @override
   Widget build(BuildContext context) {
     final s = widget.summary;
+    final scale = candyScale(context);
     final highScore =
         ref.watch(profileControllerProvider.select((p) => p.highScore));
     final unlocked = [
@@ -65,17 +66,21 @@ class _ResultsOverlayState extends ConsumerState<ResultsOverlay>
     return FadeTransition(
       opacity: _fade,
       child: Container(
-        color: Colors.black.withValues(alpha: 0.58),
+        // rgba(10,5,20,.55) dim over the game.
+        color: const Color(0xFF0A0514).withValues(alpha: 0.55),
         alignment: Alignment.center,
         child: SlideTransition(
           position: _slide,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: GlassPanel(
-              radius: 32,
-              blur: 28,
+            padding: EdgeInsets.all(16 * scale),
+            child: CandySheet(
               padding:
-                  const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                  EdgeInsets.fromLTRB(22 * scale, 26 * scale, 22 * scale, 24 * scale),
+              shadow: BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 60 * scale,
+                offset: Offset(0, 24 * scale),
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -84,94 +89,124 @@ class _ResultsOverlayState extends ConsumerState<ResultsOverlay>
                     ShaderMask(
                       shaderCallback: (bounds) => const LinearGradient(
                         colors: [
-                          AppColors.gold,
+                          Candy.yellow,
                           Color(0xFFFFF9AA),
-                          AppColors.gold,
+                          Candy.yellow,
                         ],
                       ).createShader(bounds),
                       blendMode: BlendMode.srcIn,
-                      child: const Text(
+                      child: Text(
                         '✦  NEW BEST  ✦',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 4,
+                        style: Candy.ui(
+                          size: 13 * scale,
+                          weight: FontWeight.w800,
+                          letterSpacing: 4 * scale,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8 * scale),
                   ],
                   Text(
                     s.isNewHighScore ? 'New Record!' : 'Round Over',
-                    style: TextStyle(
-                      color: s.isNewHighScore ? AppColors.gold : Colors.white,
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
+                    style: Candy.display(
+                      size: 27 * scale,
+                      height: 1.0,
+                      color:
+                          s.isNewHighScore ? Candy.yellow : Candy.titleText,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 10 * scale),
                   // Final score, shown directly (no count-up animation).
                   Text(
                     '${s.result.score}',
-                    style: const TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 68,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -2,
+                    style: Candy.display(
+                      color: Candy.orangeCtaTop,
+                      size: 74 * scale,
+                      height: 1.0,
                       shadows: [
-                        Shadow(color: AppColors.accent, blurRadius: 24),
-                        Shadow(color: AppColors.accent, blurRadius: 8),
+                        Shadow(
+                            color: Candy.orange.withValues(alpha: 0.65),
+                            blurRadius: 26 * scale),
+                        Shadow(
+                            color: Candy.pink.withValues(alpha: 0.30),
+                            blurRadius: 60 * scale),
                       ],
                     ),
                   ),
+                  SizedBox(height: 6 * scale),
                   Text(
                     'Best $highScore',
-                    style: const TextStyle(color: Colors.white54, fontSize: 15),
+                    style: Candy.ui(
+                      color:
+                          const Color(0xFFFFE1D2).withValues(alpha: 0.55),
+                      size: 14 * scale,
+                    ),
                   ),
-                  const SizedBox(height: 24),
-                  // Divider
-                  Container(
-                    height: 1,
-                    color: Colors.white.withValues(alpha: 0.10),
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 18 * scale),
+                    child: Container(
+                      height: 1,
+                      color: Colors.white.withValues(alpha: 0.14),
+                    ),
                   ),
-                  const SizedBox(height: 20),
                   _RewardRow(
-                    icon: Icons.bolt_rounded,
-                    color: AppColors.accent,
+                    chipColors: Candy.levelChip,
+                    icon: Icons.bolt,
                     label: 'XP',
                     value: '+${s.xpEarned}',
+                    valueColor: Candy.violetLight,
                   ),
                   if (s.leveledUp) ...[
-                    const SizedBox(height: 8),
+                    SizedBox(height: 10 * scale),
                     _RewardRow(
-                      icon: Icons.military_tech_rounded,
-                      color: Colors.amberAccent,
+                      chipColors: Candy.yellowChip,
+                      icon: Icons.star_rounded,
+                      iconColor: const Color(0xFF7A5300),
                       label: 'Level up!',
                       value: 'Lv ${s.newLevel}',
+                      valueColor: const Color(0xFFFFCE4D),
                     ),
                   ],
                   for (final a in unlocked) ...[
-                    const SizedBox(height: 8),
+                    SizedBox(height: 10 * scale),
                     _RewardRow(
+                      chipColors: Candy.coinsChip,
                       icon: Icons.emoji_events_rounded,
-                      color: AppColors.gold,
+                      iconColor: const Color(0xFF7A4D00),
                       label: 'Unlocked',
                       value: a.title,
+                      valueColor: Candy.yellow,
                     ),
                   ],
-                  const SizedBox(height: 28),
-                  PrimaryButton(
-                    label: 'Play Again',
-                    icon: Icons.refresh_rounded,
+                  SizedBox(height: 20 * scale),
+                  CandyCtaButton(
                     onPressed: widget.onPlayAgain,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.replay_rounded,
+                            color: Candy.ctaInk, size: 22 * scale),
+                        SizedBox(width: 8 * scale),
+                        Text(
+                          'PLAY AGAIN',
+                          style: Candy.display(
+                            color: Candy.ctaInk,
+                            size: 20 * scale,
+                            letterSpacing: 1 * scale,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: widget.onHome,
-                    child: const Text(
+                  SizedBox(height: 15 * scale),
+                  GestureDetector(
+                    onTap: widget.onHome,
+                    child: Text(
                       'Home',
-                      style: TextStyle(color: Colors.white54, fontSize: 16),
+                      style: Candy.ui(
+                        color: Colors.white.withValues(alpha: 0.5),
+                        size: 13.5 * scale,
+                      ),
                     ),
                   ),
                 ],
@@ -184,32 +219,49 @@ class _ResultsOverlayState extends ConsumerState<ResultsOverlay>
   }
 }
 
+/// A reward line: 26px radial-gradient icon chip + label + colored value.
 class _RewardRow extends StatelessWidget {
   const _RewardRow({
+    required this.chipColors,
     required this.icon,
-    required this.color,
     required this.label,
     required this.value,
+    required this.valueColor,
+    this.iconColor = Colors.white,
   });
 
+  final List<Color> chipColors;
   final IconData icon;
-  final Color color;
+  final Color iconColor;
   final String label;
   final String value;
+  final Color valueColor;
 
   @override
   Widget build(BuildContext context) {
+    final s = candyScale(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(width: 8),
+        CandyChip(
+          colors: chipColors,
+          size: 26 * s,
+          child: Icon(icon, color: iconColor, size: 16 * s),
+        ),
+        SizedBox(width: 10 * s),
         Text(label,
-            style: const TextStyle(color: Colors.white70, fontSize: 16)),
-        const SizedBox(width: 12),
+            style: Candy.ui(
+              color: Colors.white.withValues(alpha: 0.85),
+              size: 15 * s,
+              weight: FontWeight.w800,
+            )),
+        SizedBox(width: 8 * s),
         Text(value,
-            style: TextStyle(
-                color: color, fontSize: 18, fontWeight: FontWeight.bold)),
+            style: Candy.ui(
+              color: valueColor,
+              size: 15 * s,
+              weight: FontWeight.w800,
+            )),
       ],
     );
   }

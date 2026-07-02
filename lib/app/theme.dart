@@ -5,16 +5,11 @@ abstract final class AppColors {
   static const bgTop = Color(0xFF06101F);
   static const bgBottom = Color(0xFF020408);
 
-  // Vivid gaming accents
+  // Vivid gaming accents (legacy screens: profile/leaderboard/shop; the game
+  // flow uses the Candy Cosmos tokens in candy.dart instead)
   static const accent = Color(0xFF38D4F5);      // electric cyan
-  static const accent2 = Color(0xFF1870C8);     // deep blue
   static const gold = Color(0xFFFFD166);
-  static const heart = Color(0xFFFF5572);
   static const surface = Color(0xFF0C3350);
-
-  // Gaming-specific neon colors
-  static const neon = Color(0xFF00FFC8);         // emerald neon — combos
-  static const neonPurple = Color(0xFFBF5FFF);   // violet neon — special effects
 
   // Orb palette (more saturated)
   static const orbBlue    = Color(0xFF1565C0);

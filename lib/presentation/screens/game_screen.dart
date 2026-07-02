@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/game_session_controller.dart';
 import '../../application/profile_controller.dart';
+import '../../app/candy.dart';
 import '../../app/theme.dart';
 import '../../domain/models/bubble_skin.dart';
 import '../../domain/models/game_result.dart';
@@ -81,6 +82,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     return Scaffold(
       body: Stack(
         children: [
+          // Candy Cosmos nebula stage behind the (transparent-bg) game canvas.
+          const Positioned.fill(child: CandyNebulaBackground()),
           if (game != null) GameWidget<BubbleSplashGame>(game: game),
           if (game != null && _summary == null)
             GameHud(game: game, onQuit: _goHome),
@@ -107,41 +110,52 @@ class _HeadStartOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = candyScale(context);
     return IgnorePointer(
       child: ValueListenableBuilder<int>(
         valueListenable: headStart,
         builder: (_, secs, _) {
           if (secs <= 0) return const SizedBox.shrink();
           return Container(
-            color: Colors.black.withValues(alpha: 0.35),
+            // rgba(10,5,20,.45) dim over the game.
+            color: const Color(0xFF0A0514).withValues(alpha: 0.45),
             alignment: Alignment.center,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'GET READY',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 4,
+                  style: Candy.ui(
+                    color: const Color(0xFFFFE1D2).withValues(alpha: 0.75),
+                    size: 19 * s,
+                    weight: FontWeight.w800,
+                    letterSpacing: 7 * s,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 22 * s),
+                // One pulse per digit (the value ticks every second, so keying
+                // the tween on it yields the spec's 1s pulse rhythm).
                 TweenAnimationBuilder<double>(
                   key: ValueKey(secs),
-                  tween: Tween(begin: 1.4, end: 1.0),
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeOut,
+                  tween: Tween(begin: 1.18, end: 1.0),
+                  duration: const Duration(milliseconds: 500),
+                  curve: Curves.easeInOut,
                   builder: (_, scale, child) =>
                       Transform.scale(scale: scale, child: child),
                   child: Text(
                     '$secs',
-                    style: const TextStyle(
+                    style: Candy.display(
                       color: Colors.white,
-                      fontSize: 96,
-                      fontWeight: FontWeight.w900,
-                      shadows: [Shadow(color: AppColors.accent, blurRadius: 24)],
+                      size: 120 * s,
+                      height: 1.0,
+                      shadows: [
+                        Shadow(
+                            color: Candy.orange.withValues(alpha: 0.75),
+                            blurRadius: 30 * s),
+                        Shadow(
+                            color: Candy.pink.withValues(alpha: 0.40),
+                            blurRadius: 70 * s),
+                      ],
                     ),
                   ),
                 ),
