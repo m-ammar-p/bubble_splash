@@ -70,6 +70,14 @@ void main() {
     expect(profile().buySkin('neon'), isFalse); // 800 > 200 coins
   });
 
+  test('spendCoins debits only when affordable', () {
+    profile().grantCoins(300);
+    expect(profile().spendCoins(250), isTrue);
+    expect(container.read(profileControllerProvider).coins, 50);
+    expect(profile().spendCoins(100), isFalse); // insufficient → not charged
+    expect(container.read(profileControllerProvider).coins, 50);
+  });
+
   test('profile persists across controller rebuilds', () {
     profile().grantCoins(99);
     container.invalidate(profileControllerProvider);

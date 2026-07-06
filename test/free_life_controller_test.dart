@@ -52,10 +52,8 @@ void main() {
 
   test('claim is blocked (and cooldown untouched) when lives are full', () {
     final n = livesN();
-    while (container.read(livesControllerProvider).count <
-        LivesState.maxLives) {
-      n.addLife();
-    }
+    n.addLives(LivesState.maxLives -
+        container.read(livesControllerProvider).count); // fill to the cap
     expect(freeLife().claim(), isFalse);
     expect(freeLife().canClaim, isTrue); // not consumed → still available
   });

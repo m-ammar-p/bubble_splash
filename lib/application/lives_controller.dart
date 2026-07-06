@@ -51,7 +51,7 @@ class LivesController extends Notifier<LivesState> {
   void refresh() => _tick();
 
   /// Advances regeneration: grants any whole intervals' worth of lives elapsed
-  /// since [LivesState.lastRegenAtMs], capped at the max.
+  /// since [LivesState.lastRegenAtMs], capped at [LivesState.maxLives].
   static LivesState _normalize(LivesState s, int nowMs) {
     if (s.count >= LivesState.maxLives) return s;
     final interval = LivesState.regenInterval.inMilliseconds;
@@ -70,19 +70,30 @@ class LivesController extends Notifier<LivesState> {
   /// Consumes one life to start a round. Returns false if none are available.
   bool spendLife() {
     if (state.count <= 0) return false;
+    // At the cap the anchor is stale (regen is paused), so re-anchor when
+    // spending down from full — regeneration must start from this spend, not
+    // instantly refill from an old timestamp.
     final wasFull = state.isFull;
     _commit(state.copyWith(
       count: state.count - 1,
-      // Starting from a full bar, begin the regen clock now.
       lastRegenAtMs: wasFull ? _nowMs() : state.lastRegenAtMs,
     ));
     return true;
   }
 
-  /// Grants one life (e.g. from a rewarded ad), capped at the max.
+  /// Grants one life (rewarded ad / Free Life claim), capped at the max.
   void addLife() {
     if (state.isFull) return;
     _commit(state.copyWith(count: min(LivesState.maxLives, state.count + 1)));
+  }
+
+  /// Banks [amount] purchased lives (Shop). Refuses (returns false, grants
+  /// nothing) unless the whole pack fits under [LivesState.maxLives] — never
+  /// charge a player full price for a clamped partial grant.
+  bool addLives(int amount) {
+    if (state.count + amount > LivesState.maxLives) return false;
+    _commit(state.copyWith(count: state.count + amount));
+    return true;
   }
 
   /// Time until the next life regenerates, or null when full.

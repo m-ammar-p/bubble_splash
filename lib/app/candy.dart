@@ -295,6 +295,97 @@ class _CandyCtaButtonState extends State<CandyCtaButton> {
   }
 }
 
+/// Candy-styled confirmation dialog: violet sheet surface, a colored icon
+/// chip, Baloo title, optional Nunito subline, orange CTA + "Not now" link.
+/// Returns true when confirmed. Used for anything that charges the player.
+Future<bool> showCandyConfirmDialog(
+  BuildContext context, {
+  required List<Color> chipColors,
+  required IconData icon,
+  required String title,
+  String? body,
+  required String confirmLabel,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    barrierColor: const Color(0xFF0A0514).withValues(alpha: 0.55),
+    builder: (ctx) {
+      final s = candyScale(ctx);
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.symmetric(horizontal: 28 * s),
+        child: CandySheet(
+          padding: EdgeInsets.fromLTRB(20 * s, 24 * s, 20 * s, 18 * s),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56 * s,
+                height: 56 * s,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    center: const Alignment(-0.32, -0.44),
+                    radius: 0.9,
+                    colors: chipColors,
+                    stops: const [0.0, 0.60, 1.0],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: chipColors[1].withValues(alpha: 0.5),
+                      blurRadius: 24 * s,
+                      offset: Offset(0, 8 * s),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: Colors.white, size: 28 * s),
+              ),
+              SizedBox(height: 14 * s),
+              Text(title,
+                  textAlign: TextAlign.center,
+                  style: Candy.display(size: 24 * s, height: 1.1)),
+              if (body != null) ...[
+                SizedBox(height: 8 * s),
+                Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: Candy.ui(
+                    color: const Color(0xFFFFE1D2).withValues(alpha: 0.60),
+                    size: 13.5 * s,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+              SizedBox(height: 18 * s),
+              CandyCtaButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text(confirmLabel,
+                    style: Candy.ui(
+                        color: Candy.ctaInk,
+                        size: 16.5 * s,
+                        weight: FontWeight.w800)),
+              ),
+              SizedBox(height: 13 * s),
+              GestureDetector(
+                onTap: () => Navigator.of(ctx).pop(false),
+                child: Text(
+                  'Not now',
+                  style: Candy.ui(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    size: 13.5 * s,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+  return confirmed ?? false;
+}
+
 /// The violet bottom-sheet / result-card surface (screens 04 & 05):
 /// radius 26, `rgba(72,38,110,.92) → rgba(34,16,60,.96)` gradient, light border.
 class CandySheet extends StatelessWidget {

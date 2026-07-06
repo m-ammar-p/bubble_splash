@@ -55,8 +55,14 @@ void main() {
     for (var i = 0; i < LivesState.startingLives; i++) {
       n.spendLife();
     }
-    // Far in the future → should refill to the cap, not overflow.
+    // 10h = 20 intervals → 20 lives regenerated, still under the cap.
     now = now.add(const Duration(hours: 10));
+    n.refresh();
+    expect(state().count, 20);
+    expect(notifier().untilNextLife(), isNotNull);
+
+    // Far enough in the future → refills to the cap, not past it.
+    now = now.add(const Duration(days: 3));
     n.refresh();
     expect(state().count, LivesState.maxLives);
     expect(notifier().untilNextLife(), isNull);
@@ -70,6 +76,45 @@ void main() {
     expect(state().count, LivesState.maxLives);
     n.addLife(); // already full → no overflow
     expect(state().count, LivesState.maxLives);
+  });
+
+  test('purchased lives stack past the free ceiling up to maxLives', () {
+    final n = notifier();
+    expect(n.addLives(30), isTrue);
+    expect(state().count, LivesState.startingLives + 30);
+
+    // A pack that would overflow the cap is refused outright — never grant a
+    // clamped partial fill for full price (97 + 5 must not become 100).
+    expect(n.addLives(LivesState.maxLives), isFalse);
+    expect(state().count, LivesState.startingLives + 30);
+
+    // Exactly filling the bank is fine.
+    final room = LivesState.maxLives - state().count;
+    expect(n.addLives(room), isTrue);
+    expect(state().count, LivesState.maxLives);
+
+    // At max → any further purchase refused.
+    expect(n.addLives(5), isFalse);
+    expect(state().count, LivesState.maxLives);
+  });
+
+  test('regen keeps filling on top of purchased lives', () {
+    final n = notifier();
+    n.addLives(50); // 5 + 50 = 55
+    now = now.add(const Duration(hours: 10)); // 20 intervals
+    n.refresh();
+    expect(state().count, 75);
+  });
+
+  test('spending down from a full bank re-anchors the regen clock', () {
+    final n = notifier();
+    n.addLives(LivesState.maxLives - state().count); // fill to the cap
+    now = now.add(const Duration(days: 30)); // anchor goes stale while full
+    n.spendLife();
+    n.refresh();
+    // Must NOT instantly refill from the 30-day-old anchor.
+    expect(state().count, LivesState.maxLives - 1);
+    expect(n.untilNextLife(), isNotNull);
   });
 
   test('countdown shrinks toward the next life', () {

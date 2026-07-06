@@ -85,6 +85,14 @@ class ProfileController extends Notifier<PlayerProfile> {
   void grantCoins(int amount) =>
       _commit(state.copyWith(coins: state.coins + amount));
 
+  /// Debits [amount] coins (e.g. buying a life pack). Returns false if the
+  /// balance is insufficient — nothing is charged then.
+  bool spendCoins(int amount) {
+    if (state.coins < amount) return false;
+    _commit(state.copyWith(coins: state.coins - amount));
+    return true;
+  }
+
   // ---- Shop ---------------------------------------------------------------
 
   /// Buys a skin if affordable and not owned. Returns false otherwise.

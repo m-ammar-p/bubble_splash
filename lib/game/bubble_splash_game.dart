@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flame/game.dart';
 import 'package:flame_audio/flame_audio.dart';
@@ -36,7 +37,52 @@ class BubbleSplashGame extends FlameGame {
   final Random _rng = Random();
 
   double _spawnTimer = 0;
-  double get _spawnInterval => max(0.32, 0.85 - score.value * 0.01);
+  double get _spawnInterval => spawnIntervalFor(score.value);
+
+  // Difficulty ramps toward a plateau instead of growing forever. Both curves
+  // use `1 - exp(-score/k)`, which matches the old linear ramp's initial slope
+  // (the early game feels identical) but flattens out at a fixed ceiling —
+  // long runs stay playable instead of becoming impossible (retention).
+  static const double _baseSpeed = 70;
+  static const double _speedJitter = 110;
+  /// Speed bonus ceiling: score never adds more than this many px/s.
+  static const double _speedRampMax = 240;
+  /// Initial slope `_speedRampMax / _speedRampK` = 1.5 px/s per point (as before).
+  static const double _speedRampK = 160;
+  /// Spawn interval floor — never spawns faster than this.
+  static const double _minSpawnInterval = 0.38;
+
+  /// Extra upward speed earned from [score]; asymptotically approaches
+  /// [_speedRampMax]. Pure function so the cap is unit-testable.
+  static double rampSpeedBonus(int score) =>
+      _speedRampMax * (1 - exp(-score / _speedRampK));
+
+  /// Seconds between spawns at [score]; eases from 0.85 down to
+  /// [_minSpawnInterval] (initial slope 0.01 s/point, as before).
+  static double spawnIntervalFor(int score) =>
+      _minSpawnInterval + (0.85 - _minSpawnInterval) * exp(-score / 47.0);
+
+  /// Max bubbles on screen at once. One finger can't clear an avalanche: past
+  /// this the spawner waits for pops/escapes, so density stays humanly
+  /// clearable even at the spawn-rate floor (retention, not mercy).
+  static const int _maxOnScreen = 6;
+
+  /// Post-continue mercy: speed multiplier applied to spawned bubbles. Set to
+  /// [reliefFactor] (50% slower) by [continueRound] — the player just died at
+  /// full speed, so restarting there means an instant second death — then
+  /// recovers linearly back to 1.0 over [reliefRecoverySeconds] of play.
+  double _speedRelief = 1.0;
+  static const double reliefFactor = 0.5;
+  static const double reliefRecoverySeconds = 45;
+
+  /// Current mercy multiplier (1.0 = full speed). Exposed for tests.
+  @visibleForTesting
+  double get speedRelief => _speedRelief;
+
+  /// One recovery step: relief climbs linearly from [reliefFactor] back to
+  /// 1.0 over [reliefRecoverySeconds] of play. Pure so it's unit-testable.
+  static double recoverRelief(double relief, double dt) =>
+      min(1.0, relief + dt * (1.0 - reliefFactor) / reliefRecoverySeconds);
 
   /// Head-start breather after a continue: the screen is cleared and no bubbles
   /// spawn for this long, but difficulty (spawn speed, derived from score) is
@@ -86,10 +132,18 @@ class BubbleSplashGame extends FlameGame {
       if (headStart.value != secs) headStart.value = secs;
     } else {
       if (headStart.value != 0) headStart.value = 0;
+      // Post-continue mercy fades back to full speed while actually playing.
+      if (_speedRelief < 1.0) {
+        _speedRelief = recoverRelief(_speedRelief, dt);
+      }
       _spawnTimer += dt;
       if (_spawnTimer >= _spawnInterval) {
         _spawnTimer = 0;
-        _spawnBubble();
+        // Density cap: past _maxOnScreen bubbles, wait for pops/escapes
+        // instead of stacking an unclearable avalanche.
+        if (children.whereType<Bubble>().length < _maxOnScreen) {
+          _spawnBubble();
+        }
       }
     }
 
@@ -102,7 +156,10 @@ class BubbleSplashGame extends FlameGame {
   void _spawnBubble() {
     final radius = 22 + _rng.nextDouble() * 26;
     final x = radius + _rng.nextDouble() * (size.x - 2 * radius);
-    final speed = 70 + _rng.nextDouble() * 110 + score.value * 1.5;
+    final speed = (_baseSpeed +
+            _rng.nextDouble() * _speedJitter +
+            rampSpeedBonus(score.value)) *
+        _speedRelief;
 
     final roll = _rng.nextDouble();
     final kind = roll < 0.08
@@ -172,13 +229,16 @@ class BubbleSplashGame extends FlameGame {
   }
 
   /// Player spent a life / watched an ad to revive: restore HP, clear the
-  /// screen, and grant a brief head-start before bubbles return. Difficulty
-  /// (spawn speed) is preserved — only the screen is reset.
+  /// screen, and grant a brief head-start before bubbles return. Bubbles
+  /// resume at [reliefFactor] (50%) of the score-derived speed — the player
+  /// just died at full speed — then recover to full over
+  /// [reliefRecoverySeconds]; score/progression are untouched.
   void continueRound() {
     if (isGameOver || !_awaitingDecision) return;
     _awaitingDecision = false;
     hp.value = maxHp;
     combo.value = 0;
+    _speedRelief = reliefFactor;
     for (final bubble in children.whereType<Bubble>().toList()) {
       bubble.removeFromParent();
     }
@@ -229,5 +289,20 @@ class BubbleSplashGame extends FlameGame {
       _popPool = await FlameAudio.createPool('pop.wav', minPlayers: 1, maxPlayers: 5);
       _poolsLoaded = true;
     } catch (_) {/* no audio backend */}
+  }
+
+  /// Rasterized bubble sprites shared across [Bubble]s, keyed on
+  /// (kind, color, radius bucket). Instance-scoped (not static) so overlapping
+  /// game instances during a screen transition can't dispose each other's
+  /// images. Populated lazily by `Bubble.onLoad`, freed in [onRemove].
+  final Map<int, ui.Image> spriteCache = {};
+
+  @override
+  void onRemove() {
+    for (final image in spriteCache.values) {
+      image.dispose();
+    }
+    spriteCache.clear();
+    super.onRemove();
   }
 }

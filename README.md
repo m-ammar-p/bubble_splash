@@ -2,7 +2,7 @@
 
 An arcade bubble-popping game built with [Flutter](https://flutter.dev) and the
 [Flame](https://flame-engine.org) game engine, wrapped in a full meta-game:
-XP/level progression, achievements, two-metric leaderboards, a skin shop, and a
+XP/level progression, achievements, two-metric leaderboards, a lives shop, and a
 lives-as-continues economy. UI is skinned to the **"Candy Cosmos"** design
 (cosmic-violet nebula stage, glossy candy bubbles, Baloo 2 / Nunito type) —
 spec in [docs/design/candy_cosmos_handoff.md](docs/design/candy_cosmos_handoff.md).
@@ -12,12 +12,16 @@ spec in [docs/design/candy_cosmos_handoff.md](docs/design/candy_cosmos_handoff.m
 Bubbles rise from the bottom — **tap to pop and score**. Consecutive pops build
 a combo multiplier. Golden bubbles pay bonus points; popping a bomb (or missing
 3 bubbles) depletes the round. When that happens you can **continue**: spend a
-banked life or watch a rewarded ad, get a 3-second head-start, keep your
-difficulty and score. Rounds grant XP toward levels and achievements.
+banked life or watch a rewarded ad, get a 3-second head-start and a temporary
+50%-speed breather, keep your score. Difficulty ramps asymptotically and
+plateaus (speed cap, spawn floor, max 6 bubbles on screen) so long runs stay
+playable. Rounds grant XP toward levels and achievements.
 
 **Economy:** play is always free — lives are never needed to start. Lives are
-in-round continues, earned passively (1 per 30 min) and via the Free Life ad
-claim, banked up to 10. Coins are a purchasable currency spent only on skins.
+in-round continues, earned passively (1 per 30 min), via the Free Life ad
+claim, and bought in the Shop with coins — all banked up to a single cap of
+100. Coins are a purchasable currency (IAP) spent on life packs; every
+purchase goes through one confirmation dialog.
 
 ## Tech stack
 

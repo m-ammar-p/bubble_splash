@@ -21,7 +21,7 @@ class CoinPack {
 const List<CoinPack> kCoinPacks = [
   CoinPack(id: 'coins_small', coins: 500, priceLabel: r'$0.99'),
   CoinPack(id: 'coins_medium', coins: 1500, priceLabel: r'$2.99'),
-  CoinPack(id: 'coins_large', coins: 5000, priceLabel: r'$7.99'),
+  CoinPack(id: 'coins_large', coins: 3000, priceLabel: r'$4.99'),
 ];
 
 /// Initiates an in-app purchase for a coin pack. Returns the purchased pack on

@@ -54,56 +54,83 @@ class Bubble extends CircleComponent
   /// to at least this (visual size is unchanged).
   static const double _minHitRadius = 34;
 
+  /// Reaction-lag compensation: the bubble rises while the fingertip lags
+  /// ~100 ms behind, so taps on fast bubbles land *below* where the bubble now
+  /// is. The hit zone is stretched downward by this many seconds of travel.
+  static const double _lagCompSeconds = 0.10;
+
   /// Expand the tap zone beyond the visual radius for small bubbles. Without
   /// this, a radius-22 bubble has a 44px target the fingertip fully occludes.
+  /// The zone is also a downward capsule ([_lagCompSeconds]) so aiming at
+  /// where a fast bubble *was* still pops it.
   @override
   bool containsLocalPoint(Vector2 point) {
     final hit = max(radius, _minHitRadius);
     final dx = point.x - radius;
-    final dy = point.y - radius;
+    var dy = point.y - radius;
+    if (dy > 0) dy = max(0.0, dy - speed * _lagCompSeconds);
     return dx * dx + dy * dy <= hit * hit;
   }
 
-  /// The orb's appearance depends only on (radius, color), never on the frame,
-  /// so it is painted once into [_sprite] (an offscreen image, blurs and all)
-  /// and blitted each frame. This removes the per-frame MaskFilter.blur ×3 and
+  /// The orb's appearance depends only on (kind, color, radius), never on the
+  /// frame, so it is painted once into an offscreen image (blurs and all) and
+  /// blitted each frame. This removes the per-frame MaskFilter.blur ×3 and
   /// RadialGradient.createShader allocation that tanked the frame rate.
+  ///
+  /// Identical bubbles share one cached image: re-rasterizing + GPU-uploading a
+  /// fresh image on *every spawn* (up to ~3/s) caused micro-jank. Radius is
+  /// bucketed to 4px steps and the blit rect scales the ≲2px difference away.
+  /// The cache lives on the game instance (see `BubbleSplashGame.spriteCache`)
+  /// so overlapping game instances during a screen transition can't dispose
+  /// each other's images; the game disposes its own cache when it detaches.
   ui.Image? _sprite;
   double _pad = 0;
 
   @override
-  Future<void> onLoad() async {
-    await _buildSprite();
+  void onLoad() {
+    _pad = radius * 0.4;
+    final bucket = max(1, (radius / 4).round());
+    final key = Object.hash(kind, paint.color.toARGB32(), bucket);
+    var sprite = game.spriteCache[key];
+    if (sprite == null) {
+      sprite = _buildSprite(bucket * 4.0);
+      if (sprite == null) return; // headless: keep cheap fallback in render()
+      game.spriteCache[key] = sprite;
+    }
+    _sprite = sprite;
   }
 
-  /// Paint the orb once into a cached image. The glow halo bleeds past the
-  /// circle, so the image is padded.
-  Future<void> _buildSprite() async {
-    _pad = radius * 0.4;
-    final dim = (radius * 2 + _pad * 2).ceil();
+  /// Paint the orb once at the bucketed radius [r] into a GPU-resident image.
+  /// The glow halo bleeds past the circle, so the image is padded (same 0.4·r
+  /// ratio as the blit rect, so scaling stays uniform). Returns null where no
+  /// rasterizer exists (headless tests).
+  ui.Image? _buildSprite(double r) {
+    final pad = r * 0.4;
+    final dim = (r * 2 + pad * 2).ceil();
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    final center = Offset(radius + _pad, radius + _pad);
+    final center = Offset(r + pad, r + pad);
     if (kind == BubbleKind.bomb) {
-      _paintBomb(canvas, center);
+      _paintBomb(canvas, center, r);
     } else {
-      _paintCandy(canvas, center);
+      _paintCandy(canvas, center, r);
     }
     final picture = recorder.endRecording();
-    final image = await picture.toImage(dim, dim);
-    picture.dispose();
-    if (isRemoving || isRemoved) {
-      image.dispose();
-      return;
+    try {
+      return picture.toImageSync(dim, dim);
+    } catch (_) {
+      return null;
+    } finally {
+      picture.dispose();
     }
-    _sprite = image;
   }
 
   /// Candy gloss recipe from the handoff:
   /// `radial-gradient(circle at 34% 26%, #FFF, light 20%, mid 54%, dark)` +
   /// outer accent glow + dark bottom-right / white top-left inner shading.
-  /// Light/dark are derived from the palette color. Run once into the cache.
-  void _paintCandy(Canvas canvas, Offset center) {
+  /// Light/dark are derived from the palette color. Run once into the cache,
+  /// at the bucketed radius [r].
+  void _paintCandy(Canvas canvas, Offset center, double r) {
     final mid = paint.color;
     final hsl = HSLColor.fromColor(mid);
     final light =
@@ -113,18 +140,18 @@ class Bubble extends CircleComponent
 
     // Outer accent glow (box-shadow 0 12px 34px accent .5).
     canvas.drawCircle(
-      center.translate(0, radius * 0.10),
-      radius,
+      center.translate(0, r * 0.10),
+      r,
       Paint()
         ..color = mid.withValues(alpha: 0.5)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * 0.28),
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.28),
     );
 
-    final bodyRect = Rect.fromCircle(center: center, radius: radius);
+    final bodyRect = Rect.fromCircle(center: center, radius: r);
     // Glossy body with the white specular baked into the gradient.
     canvas.drawCircle(
       center,
-      radius,
+      r,
       Paint()
         ..shader = RadialGradient(
           center: const Alignment(-0.32, -0.48),
@@ -139,36 +166,37 @@ class Bubble extends CircleComponent
     canvas.clipPath(Path()..addOval(bodyRect));
     // inset -6px -8px 16px dark — depth along the bottom-right rim.
     canvas.drawCircle(
-      center.translate(-radius * 0.10, -radius * 0.14),
-      radius,
+      center.translate(-r * 0.10, -r * 0.14),
+      r,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = radius * 0.30
+        ..strokeWidth = r * 0.30
         ..color = dark.withValues(alpha: 0.5)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * 0.18),
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.18),
     );
     // inset 5px 5px 12px white .42 — sheen along the top-left rim.
     canvas.drawCircle(
-      center.translate(radius * 0.08, radius * 0.08),
-      radius,
+      center.translate(r * 0.08, r * 0.08),
+      r,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = radius * 0.18
+        ..strokeWidth = r * 0.18
         ..color = Colors.white.withValues(alpha: 0.42)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * 0.14),
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.14),
     );
     canvas.restore();
   }
 
   /// Bomb: translucent glass ball with a cartoon bomb (dark body, highlight,
-  /// fuse, orange spark) drawn inside. Run once into the cache.
-  void _paintBomb(Canvas canvas, Offset center) {
-    final bodyRect = Rect.fromCircle(center: center, radius: radius);
+  /// fuse, orange spark) drawn inside. Run once into the cache, at the
+  /// bucketed radius [rad].
+  void _paintBomb(Canvas canvas, Offset center, double rad) {
+    final bodyRect = Rect.fromCircle(center: center, radius: rad);
 
     // Glass ball: rgba(255,255,255,.35) → .10 30% → slate .10 60% → dark .20.
     canvas.drawCircle(
       center,
-      radius,
+      rad,
       Paint()
         ..shader = RadialGradient(
           center: const Alignment(-0.32, -0.48),
@@ -185,7 +213,7 @@ class Bubble extends CircleComponent
     // 1.5px rgba(255,255,255,.4) border.
     canvas.drawCircle(
       center,
-      radius - 0.75,
+      rad - 0.75,
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5
@@ -193,8 +221,8 @@ class Bubble extends CircleComponent
     );
 
     // Cartoon bomb body.
-    final r = radius * 0.42;
-    final bodyC = center.translate(0, radius * 0.12);
+    final r = rad * 0.42;
+    final bodyC = center.translate(0, rad * 0.12);
     canvas.drawCircle(bodyC, r, Paint()..color = const Color(0xFF33333D));
     // Specular highlight on the body.
     canvas.drawCircle(
@@ -225,19 +253,19 @@ class Bubble extends CircleComponent
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round
-        ..strokeWidth = radius * 0.07
+        ..strokeWidth = rad * 0.07
         ..color = const Color(0xFF8A7A66),
     );
     // Orange spark at the fuse tip (soft glow + core).
     canvas.drawCircle(
       fuseEnd,
-      radius * 0.16,
+      rad * 0.16,
       Paint()
         ..color = const Color(0xFFFFB13D).withValues(alpha: 0.55)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * 0.10),
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, rad * 0.10),
     );
     canvas.drawCircle(
-        fuseEnd, radius * 0.09, Paint()..color = const Color(0xFFFFB13D));
+        fuseEnd, rad * 0.09, Paint()..color = const Color(0xFFFFB13D));
   }
 
   @override
@@ -263,12 +291,8 @@ class Bubble extends CircleComponent
     );
   }
 
-  @override
-  void onRemove() {
-    _sprite?.dispose();
-    _sprite = null;
-    super.onRemove();
-  }
+  // No onRemove image dispose: _sprite is shared via the game's spriteCache,
+  // which the game disposes wholesale in its own onRemove.
 
   @override
   void update(double dt) {

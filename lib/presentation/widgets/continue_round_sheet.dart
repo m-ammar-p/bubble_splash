@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/lives_controller.dart';
 import '../../application/providers.dart';
 import '../../app/candy.dart';
+import '../../domain/models/lives_state.dart';
 import '../../game/bubble_splash_game.dart';
 
 /// Shown when round HP is depleted. The player can spend a banked life to
@@ -71,6 +72,9 @@ class _ContinueRoundSheetState extends ConsumerState<_ContinueRoundSheet> {
     final lives = ref.watch(livesControllerProvider);
     final hasLife = lives.count > 0;
     final adsLeft = _maxAds - _adsWatched;
+    // A full bank can't hold an ad life — offering an ad that grants nothing
+    // would rob the player, so the option is disabled at the cap.
+    final bankFull = lives.isFull;
     final s = candyScale(context);
 
     return CandySheet(
@@ -153,11 +157,13 @@ class _ContinueRoundSheetState extends ConsumerState<_ContinueRoundSheet> {
             ),
             SizedBox(height: 10 * s),
             _GlassButton(
-              onPressed: adsLeft > 0 && !_busy ? _watchAd : null,
+              onPressed: adsLeft > 0 && !bankFull && !_busy ? _watchAd : null,
               icon: Icons.ondemand_video_rounded,
-              label: adsLeft > 0
-                  ? 'Watch ad · +1 life ($adsLeft left)'
-                  : 'Ad limit reached',
+              label: bankFull
+                  ? 'Lives full (${LivesState.maxLives})'
+                  : adsLeft > 0
+                      ? 'Watch ad · +1 life ($adsLeft left)'
+                      : 'Ad limit reached',
             ),
             SizedBox(height: 15 * s),
             GestureDetector(

@@ -4,7 +4,8 @@ import 'dart:convert';
 /// start a round for free. Instead a life is an in-round *continue*: when round
 /// HP is depleted, spending one life revives the run. Lives are earned passively
 /// (one per [regenInterval], timestamp-based so it works while the app is
-/// closed) and via the "Free Life" rewarded-ad claim, banking up to [maxLives].
+/// closed), via rewarded-ad claims, and *bought* in the Shop with coins — all
+/// paths bank up to the single [maxLives] cap.
 class LivesState {
   const LivesState({
     required this.count,
@@ -16,8 +17,9 @@ class LivesState {
   /// Epoch millis marking the start of the interval currently regenerating.
   final int lastRegenAtMs;
 
-  /// Bank cap. Lives accumulate up to here from passive regen + ad claims.
-  static const int maxLives = 10;
+  /// The one bank cap, for every source (regen, ads, purchases). Deliberately
+  /// a single number — a separate free-lives ceiling confused players.
+  static const int maxLives = 100;
 
   /// Lives a brand-new player starts with.
   static const int startingLives = 5;

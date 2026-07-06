@@ -134,3 +134,15 @@ unchecked phase.
   `FractionallySizedBox` had no `heightFactor` (collapsed to 0) and `ClipRRect` clipped the
   glow. Now an explicit 10px white-.14 track Container with a left-aligned `heightFactor:1`
   orange fill and un-clipped glow (matches spec box-shadow). `flutter analyze` clean.
+- 2026-07-06: **Gameplay tuning + perf + lives-economy rework.** Difficulty now plateaus
+  (asymptotic speed/spawn curves, +240px/s cap, 0.38s spawn floor, max 6 bubbles on screen,
+  post-continue 50%-speed relief recovering over 45s — `test/difficulty_test.dart` pins it);
+  bubble hit zones lag-compensate downward ~100ms of travel. Perf: bubble sprites shared via
+  a per-game cache + `toImageSync` (no per-spawn raster), `ScorePopup` rasterized once
+  (was: full text layout every frame). Shop reworked: sells **life packs** (+5/+15/+30 for
+  coins), coin packs 500/1500/3000 — skins no longer sold (system stays in code). Lives:
+  single 100 cap for every source (a 10/100 two-cap split was tried and reverted — confusing);
+  packs that don't fit are refused un-charged; ad offers disabled at full bank. New shared
+  `showCandyConfirmDialog` in `candy.dart` (violet sheet, icon chip, orange CTA) — exactly one
+  popup per purchase; `FakePurchaseService` no longer shows its own dialog. `flutter analyze`
+  clean, all 36 tests pass; verified live on emulator-5554 in profile mode (avg 3–6ms/frame).

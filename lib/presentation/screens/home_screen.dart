@@ -119,6 +119,8 @@ class _HeaderStats extends ConsumerWidget {
         _StatPill(
           chipColors: Candy.livesChip,
           glyph: Icon(Icons.favorite, color: Colors.white, size: 14 * s),
+          // Always against the absolute bank cap, matching the Shop's
+          // "N/100 banked" counter — one max everywhere, no 10-vs-100 confusion.
           label: '$count/${LivesState.maxLives}',
         ),
       ],
@@ -372,7 +374,7 @@ class _FreeLifeCard extends StatelessWidget {
 
     final Widget text;
     if (livesFull) {
-      text = Text('Lives full',
+      text = Text('Lives full (${LivesState.maxLives})',
           style: Candy.ui(size: 15 * s, weight: FontWeight.w800));
     } else if (canClaim) {
       text = Text('Watch ad for a free life',
