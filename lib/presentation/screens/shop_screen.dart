@@ -5,17 +5,15 @@ import '../../application/lives_controller.dart';
 import '../../application/profile_controller.dart';
 import '../../application/providers.dart';
 import '../../app/candy.dart';
-import '../../app/theme.dart';
 import '../../domain/models/life_pack.dart';
 import '../../domain/models/lives_state.dart';
 import '../../domain/services/purchase_service.dart';
-import '../widgets/glass.dart';
-import '../widgets/status_badges.dart';
 
 /// The Shop sells lives (the continue currency) for coins, and coins for real
 /// money (fake IAP for now). Bubble skins are no longer sold here — the skin
 /// system still exists in code (the game reads the equipped palette) but the
-/// shop's job is the lives economy.
+/// shop's job is the lives economy. Skinned to Candy Cosmos, matching the
+/// Profile screen's header/section/card structure.
 class ShopScreen extends ConsumerWidget {
   const ShopScreen({super.key});
 
@@ -23,79 +21,128 @@ class ShopScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final coins = ref.watch(profileControllerProvider.select((p) => p.coins));
     final lives = ref.watch(livesControllerProvider);
+    final s = candyScale(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Shop'),
-        actions: const [
-          Padding(padding: EdgeInsets.only(right: 16), child: Center(child: CoinBadge())),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Stack(
         children: [
-          const Text('Get Coins',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          const Text('Buy coins to stock up on lives below.',
-              style: TextStyle(color: Colors.white54, fontSize: 13)),
-          const SizedBox(height: 12),
-          // Fixed row — all packs fit on screen, no horizontal sliding.
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < kCoinPacks.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 12),
+          const Positioned.fill(child: CandyNebulaBackground()),
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16 * s, 10 * s, 16 * s, 0),
+              child: Column(
+                children: [
+                  _Header(coins: coins),
                   Expanded(
-                    child: _CoinPackCard(
-                      pack: kCoinPacks[i],
-                      onBuy: () => _buyCoins(context, ref, kCoinPacks[i]),
+                    child: ListView(
+                      padding: EdgeInsets.only(top: 14 * s, bottom: 20 * s),
+                      children: [
+                        const _SectionLabel('GET COINS'),
+                        SizedBox(height: 4 * s),
+                        Text('Buy coins to stock up on lives below.',
+                            style: Candy.ui(
+                                size: 12 * s,
+                                color:
+                                    Colors.white.withValues(alpha: 0.55))),
+                        SizedBox(height: 10 * s),
+                        // Fixed row — all packs fit on screen, no sliding.
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (var i = 0; i < kCoinPacks.length; i++) ...[
+                                if (i > 0) SizedBox(width: 8 * s),
+                                Expanded(
+                                  child: _PackCard(
+                                    chip: Candy.coinsChip,
+                                    icon: Icons.monetization_on,
+                                    iconColor: const Color(0xFF7A5300),
+                                    value: '${kCoinPacks[i].coins}',
+                                    label: 'coins',
+                                    button: Text(kCoinPacks[i].priceLabel,
+                                        maxLines: 1,
+                                        style: Candy.ui(
+                                            size: 12.5 * s,
+                                            weight: FontWeight.w800,
+                                            color: Candy.ctaInk)),
+                                    onBuy: () =>
+                                        _buyCoins(context, ref, kCoinPacks[i]),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 18 * s),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
+                          children: [
+                            const _SectionLabel('LIVES'),
+                            const Spacer(),
+                            Text(
+                                '${lives.count}/${LivesState.maxLives} banked',
+                                style: Candy.ui(
+                                    size: 12 * s,
+                                    weight: FontWeight.w800,
+                                    color: const Color(0x99FFE1D2))),
+                          ],
+                        ),
+                        SizedBox(height: 4 * s),
+                        Text('Lives revive a run when you go down mid-round.',
+                            style: Candy.ui(
+                                size: 12 * s,
+                                color:
+                                    Colors.white.withValues(alpha: 0.55))),
+                        SizedBox(height: 10 * s),
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (var i = 0; i < kLifePacks.length; i++) ...[
+                                if (i > 0) SizedBox(width: 8 * s),
+                                Expanded(
+                                  child: _PackCard(
+                                    chip: Candy.livesChip,
+                                    icon: Icons.favorite,
+                                    iconColor: Colors.white,
+                                    value: '+${kLifePacks[i].lives}',
+                                    label: 'lives',
+                                    button: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.monetization_on,
+                                            size: 13 * s,
+                                            color: Candy.ctaInk),
+                                        SizedBox(width: 3 * s),
+                                        Text('${kLifePacks[i].priceCoins}',
+                                            maxLines: 1,
+                                            style: Candy.ui(
+                                                size: 12.5 * s,
+                                                weight: FontWeight.w800,
+                                                color: Candy.ctaInk)),
+                                      ],
+                                    ),
+                                    // Buyable only if affordable AND the whole
+                                    // pack fits — partial fills are never sold
+                                    // (see _buyLives).
+                                    enabled: coins >=
+                                            kLifePacks[i].priceCoins &&
+                                        lives.count + kLifePacks[i].lives <=
+                                            LivesState.maxLives,
+                                    onBuy: () =>
+                                        _buyLives(context, ref, kLifePacks[i]),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              const Text('Lives',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold)),
-              const Spacer(),
-              Text('${lives.count}/${LivesState.maxLives} banked',
-                  style: const TextStyle(color: Colors.white54, fontSize: 13)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          const Text('Lives revive a run when you go down mid-round.',
-              style: TextStyle(color: Colors.white54, fontSize: 13)),
-          const SizedBox(height: 12),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (var i = 0; i < kLifePacks.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 12),
-                  Expanded(
-                    child: _LifePackCard(
-                      pack: kLifePacks[i],
-                      // Buyable only if affordable AND the whole pack fits —
-                      // partial fills are never sold (see _buyLives).
-                      affordable: coins >= kLifePacks[i].priceCoins &&
-                          lives.count + kLifePacks[i].lives <=
-                              LivesState.maxLives,
-                      onBuy: () => _buyLives(context, ref, kLifePacks[i]),
-                    ),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ],
@@ -174,49 +221,48 @@ class ShopScreen extends ConsumerWidget {
   }
 }
 
-class _CoinPackCard extends StatelessWidget {
-  const _CoinPackCard({required this.pack, required this.onBuy});
-
-  final CoinPack pack;
-  final VoidCallback onBuy;
+/// Glass back circle · centered "Shop" title · coin balance pill (right).
+class _Header extends StatelessWidget {
+  const _Header({required this.coins});
+  final int coins;
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      radius: 16,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    final s = candyScale(context);
+    return SizedBox(
+      height: 38 * s,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          const Icon(Icons.monetization_on, color: AppColors.gold, size: 28),
-          const SizedBox(height: 8),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text('${pack.coins}',
-                maxLines: 1,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold)),
+          Text('Shop', style: Candy.display(size: 20 * s)),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: CandyGlass(
+              width: 38 * s,
+              height: 38 * s,
+              alignment: Alignment.center,
+              onTap: () => Navigator.pop(context),
+              child: Icon(Icons.arrow_back,
+                  size: 17 * s, color: Colors.white.withValues(alpha: 0.85)),
+            ),
           ),
-          const Text('coins',
-              style: TextStyle(color: Colors.white54, fontSize: 12)),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: onBuy,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.gold,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                minimumSize: Size.zero,
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(pack.priceLabel,
-                    maxLines: 1,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+          Align(
+            alignment: Alignment.centerRight,
+            child: CandyGlass(
+              padding: EdgeInsets.fromLTRB(4 * s, 4 * s, 13 * s, 4 * s),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CandyChip(
+                    colors: Candy.coinsChip,
+                    size: 26 * s,
+                    child: Icon(Icons.monetization_on,
+                        size: 15 * s, color: const Color(0xFF7A5300)),
+                  ),
+                  SizedBox(width: 7 * s),
+                  Text('$coins',
+                      style: Candy.ui(size: 14 * s, weight: FontWeight.w800)),
+                ],
               ),
             ),
           ),
@@ -226,57 +272,80 @@ class _CoinPackCard extends StatelessWidget {
   }
 }
 
-class _LifePackCard extends StatelessWidget {
-  const _LifePackCard({
-    required this.pack,
-    required this.affordable,
-    required this.onBuy,
-  });
-
-  final LifePack pack;
-  final bool affordable;
-  final VoidCallback onBuy;
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    return GlassPanel(
-      radius: 16,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+    final s = candyScale(context);
+    return Text(text,
+        style: Candy.ui(
+            size: 12 * s,
+            weight: FontWeight.w800,
+            letterSpacing: 2.5 * s,
+            color: const Color(0x8CFFE1D2)));
+  }
+}
+
+/// Glass pack card: gradient icon chip, Baloo amount, Nunito unit label and an
+/// orange CTA (dimmed via [CandyCtaButton]'s disabled state when [enabled] is
+/// false). Shared by coin and life packs.
+class _PackCard extends StatelessWidget {
+  const _PackCard({
+    required this.chip,
+    required this.icon,
+    required this.iconColor,
+    required this.value,
+    required this.label,
+    required this.button,
+    required this.onBuy,
+    this.enabled = true,
+  });
+
+  final List<Color> chip;
+  final IconData icon;
+  final Color iconColor;
+  final String value;
+  final String label;
+  final Widget button;
+  final VoidCallback onBuy;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return CandyGlass(
+      radius: 16 * s,
+      surfaceAlpha: 0.08,
+      borderAlpha: 0.14,
+      padding: EdgeInsets.fromLTRB(8 * s, 12 * s, 8 * s, 10 * s),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Icon(Icons.favorite, color: Color(0xFFFF5B79), size: 28),
-          const SizedBox(height: 8),
+          CandyChip(
+            colors: chip,
+            size: 34 * s,
+            child: Icon(icon, size: 17 * s, color: iconColor),
+          ),
+          SizedBox(height: 8 * s),
           FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text('+${pack.lives}',
+            child: Text(value,
                 maxLines: 1,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold)),
+                style: Candy.display(
+                    size: 19 * s, color: Colors.white, height: 1)),
           ),
-          const Text('lives',
-              style: TextStyle(color: Colors.white54, fontSize: 12)),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: affordable ? onBuy : null,
-              icon: const Icon(Icons.monetization_on, size: 16),
-              style: FilledButton.styleFrom(
-                backgroundColor: affordable ? AppColors.gold : Colors.white12,
-                foregroundColor: affordable ? Colors.black : Colors.white38,
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                minimumSize: Size.zero,
-              ),
-              label: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text('${pack.priceCoins}',
-                    maxLines: 1,
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
+          SizedBox(height: 1 * s),
+          Text(label,
+              style: Candy.ui(
+                  size: 11 * s, color: Colors.white.withValues(alpha: 0.55))),
+          SizedBox(height: 9 * s),
+          CandyCtaButton(
+            height: 30,
+            radius: 11,
+            onPressed: enabled ? onBuy : null,
+            child: FittedBox(fit: BoxFit.scaleDown, child: button),
           ),
         ],
       ),
