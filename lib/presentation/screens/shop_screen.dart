@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../application/auth_controller.dart';
 import '../../application/lives_controller.dart';
 import '../../application/profile_controller.dart';
 import '../../application/providers.dart';
@@ -8,6 +9,7 @@ import '../../app/candy.dart';
 import '../../domain/models/life_pack.dart';
 import '../../domain/models/lives_state.dart';
 import '../../domain/services/purchase_service.dart';
+import '../widgets/google_sign_in_button.dart';
 
 /// The Shop sells lives (the continue currency) for coins, and coins for real
 /// money (fake IAP for now). Bubble skins are no longer sold here — the skin
@@ -199,6 +201,19 @@ class ShopScreen extends ConsumerWidget {
 
   Future<void> _buyCoins(
       BuildContext context, WidgetRef ref, CoinPack pack) async {
+    // Real-money purchases require an account: a guest's coins would live only
+    // on this device and vanish with it. Prompt at the moment of intent and,
+    // on success, continue straight into the purchase they tapped.
+    if (!ref.read(authControllerProvider).isSignedIn) {
+      final signedIn = await showGoogleSignInDialog(
+        context,
+        title: 'Sign in to buy coins',
+        body: 'Purchases link to your Google account, so your coins and '
+            'progress are never lost.',
+      );
+      if (!signedIn || !context.mounted) return;
+    }
+
     // Exactly ONE popup per purchase: this Candy dialog. The fake service
     // shows no UI (a real store adds its own platform sheet later).
     final ok = await showCandyConfirmDialog(
@@ -230,7 +245,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = candyScale(context);
     return SizedBox(
-      height: 38 * s,
+      height: kCandyBackCircleSize * s,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -242,7 +257,7 @@ class _Header extends StatelessWidget {
             child: CandyStatPill(
               chipColors: Candy.coinsChip,
               glyph: Icon(Icons.monetization_on,
-                  size: 15 * s, color: const Color(0xFF7A5300)),
+                  size: 13 * s, color: const Color(0xFF7A5300)),
               label: '$coins',
             ),
           ),

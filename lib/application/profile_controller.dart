@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/models/achievement.dart';
+import '../domain/models/auth_state.dart';
 import '../domain/models/bubble_skin.dart';
 import '../domain/models/game_result.dart';
 import '../domain/models/player_profile.dart';
@@ -23,24 +24,30 @@ class ProfileController extends Notifier<PlayerProfile> {
     final repo = ref.watch(profileRepositoryProvider(account?.id));
     final loaded = repo.load();
     if (loaded != null) return loaded;
-    // Fresh player: give a unique, tagged default name (the Google display
-    // name when signed in) and persist it so the id (and thus the tag) is
-    // stable across launches.
+    // Fresh player: readable base name ("Guest", or the Google account's
+    // first name) + the stable #tag, persisted so the id (and thus the tag)
+    // is stable across launches.
     final id = _newId();
     final fresh = PlayerProfile.initial(id: id)
-        .copyWith(name: _taggedName(account?.displayName ?? 'Player', id));
+        .copyWith(name: _taggedName(_baseNameFor(account), id));
     repo.save(fresh);
     return fresh;
   }
 
+  /// "Guest" for guests; the person's first name for Google accounts.
+  static String _baseNameFor(AuthAccount? account) {
+    if (account == null) return 'Guest';
+    final first = account.displayName.trim().split(RegExp(r'\s+')).first;
+    return first.isEmpty ? 'Player' : first;
+  }
+
   /// A stable 4-digit discriminator derived from the profile id, so player
   /// names are always unique even when two players pick the same base name
-  /// (Discord-style, e.g. "Ace#0421").
+  /// (Discord-style, e.g. "Guest#0421").
   static String _tagFor(String id) =>
       (id.hashCode & 0x7fffffff).remainder(10000).toString().padLeft(4, '0');
 
-  static String _taggedName(String base, String id) =>
-      '$base#${_tagFor(id)}';
+  static String _taggedName(String base, String id) => '$base#${_tagFor(id)}';
 
   void _commit(PlayerProfile next) {
     state = next;
@@ -132,9 +139,15 @@ class ProfileController extends Notifier<PlayerProfile> {
 
   // ---- Profile editing ----------------------------------------------------
 
+  /// Custom names are an account perk: guests keep their fixed "Guest#tag"
+  /// identity (the UI routes guests to sign-in instead of the name dialog;
+  /// this guard backs that up).
+  bool get canRename => ref.read(authControllerProvider).isSignedIn;
+
   void rename(String name) {
-    // Drop any existing "#tag" the user typed, then re-append the stable tag so
-    // the name stays unique.
+    if (!canRename) return;
+    // Drop any "#tag" the user typed, then re-append the stable tag so the
+    // name stays unique.
     final base = name.trim().split('#').first.trim();
     if (base.isEmpty) return;
     _commit(state.copyWith(name: _taggedName(base, state.id)));

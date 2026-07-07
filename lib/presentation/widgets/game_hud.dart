@@ -62,7 +62,8 @@ class GameHud extends StatelessWidget {
   }
 }
 
-/// 38×38 glass circle with a white × — pause/quit.
+/// 34×34 glass circle with a white × — pause/quit (matches the meta headers'
+/// [kCandyBackCircleSize]).
 class _CloseButton extends StatelessWidget {
   const _CloseButton({required this.onTap});
   final VoidCallback onTap;
@@ -73,15 +74,15 @@ class _CloseButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 38 * s,
-        height: 38 * s,
+        width: kCandyBackCircleSize * s,
+        height: kCandyBackCircleSize * s,
         alignment: Alignment.center,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Candy.glass(),
           border: Border.all(color: Candy.glassBorder()),
         ),
-        child: Icon(Icons.close_rounded, color: Colors.white, size: 17 * s),
+        child: Icon(Icons.close_rounded, color: Colors.white, size: 15 * s),
       ),
     );
   }
@@ -96,12 +97,12 @@ class _ScorePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = candyScale(context);
     return CandyGlass(
-      radius: 16 * s,
-      padding: EdgeInsets.symmetric(horizontal: 16 * s, vertical: 6 * s),
+      radius: 15 * s,
+      padding: EdgeInsets.symmetric(horizontal: 14 * s, vertical: 5 * s),
       child: Text(
         '$score',
         style: Candy.display(
-          size: 28 * s,
+          size: 25 * s,
           height: 1.0,
           shadows: [
             Shadow(
@@ -139,7 +140,7 @@ class _RoundHearts extends StatelessWidget {
                 ? Icon(
                     Icons.favorite,
                     color: Candy.heart,
-                    size: 21 * s,
+                    size: 19 * s,
                     shadows: [
                       Shadow(
                           color: Candy.heart.withValues(alpha: 0.6),
@@ -149,7 +150,7 @@ class _RoundHearts extends StatelessWidget {
                 : Icon(
                     Icons.favorite_border,
                     color: Colors.white.withValues(alpha: 0.30),
-                    size: 21 * s,
+                    size: 19 * s,
                   ),
           ),
         ),
@@ -242,18 +243,18 @@ class _LivesPill extends ConsumerWidget {
     final count = ref.watch(livesControllerProvider.select((s) => s.count));
     final s = candyScale(context);
     return CandyGlass(
-      padding: EdgeInsets.fromLTRB(4 * s, 4 * s, 11 * s, 4 * s),
+      padding: EdgeInsets.fromLTRB(3.5 * s, 3.5 * s, 10 * s, 3.5 * s),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           CandyChip(
             colors: Candy.livesChip,
-            size: 24 * s,
-            child: Icon(Icons.favorite, color: Colors.white, size: 13 * s),
+            size: 22 * s,
+            child: Icon(Icons.favorite, color: Colors.white, size: 12 * s),
           ),
-          SizedBox(width: 7 * s),
+          SizedBox(width: 6 * s),
           Text('$count',
-              style: Candy.ui(size: 13 * s, weight: FontWeight.w800)),
+              style: Candy.ui(size: 12 * s, weight: FontWeight.w800)),
         ],
       ),
     );

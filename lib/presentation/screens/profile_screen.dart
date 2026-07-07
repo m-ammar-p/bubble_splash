@@ -7,6 +7,7 @@ import '../../application/auth_controller.dart';
 import '../../application/profile_controller.dart';
 import '../../domain/models/achievement.dart';
 import '../../domain/models/player_profile.dart';
+import '../widgets/google_sign_in_button.dart';
 import '../widgets/player_avatar.dart';
 
 /// Maps an achievement's domain [Achievement.iconKey] to a Material icon.
@@ -100,7 +101,7 @@ class _Header extends StatelessWidget {
       children: [
         const CandyBackCircle(),
         Text('Profile', style: Candy.display(size: 20 * s)),
-        SizedBox(width: 38 * s),
+        SizedBox(width: kCandyBackCircleSize * s),
       ],
     );
   }
@@ -177,7 +178,7 @@ class _AvatarBlock extends ConsumerWidget {
         ),
         SizedBox(height: 9 * s),
         GestureDetector(
-          onTap: () => showNameDialog(context, ref),
+          onTap: () => _editName(context, ref),
           child: Text(
             profile.name,
             style: Candy.display(size: 23 * s, color: Colors.white, height: 1),
@@ -185,6 +186,22 @@ class _AvatarBlock extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// Custom names are an account perk: guests get the sign-in prompt instead
+  /// of the name dialog, and land straight in it after signing in.
+  Future<void> _editName(BuildContext context, WidgetRef ref) async {
+    if (!ref.read(authControllerProvider).isSignedIn) {
+      final signedIn = await showGoogleSignInDialog(
+        context,
+        title: 'Sign in to set your name',
+        body: 'Guests play as ${ref.read(profileControllerProvider).name}. '
+            'Sign in with Google to pick your own name and keep your '
+            'progress on your account.',
+      );
+      if (!signedIn || !context.mounted) return;
+    }
+    await showNameDialog(context, ref);
   }
 }
 

@@ -54,9 +54,9 @@ class HomeScreen extends ConsumerWidget {
                 children: [
                   const _HeaderStats(),
                   SizedBox(height: 10 * s),
-                  const _BubbleCluster(),
+                  const CandyBubbleCluster(),
                   SizedBox(height: 14 * s),
-                  const _Title(),
+                  const CandyGameTitle(),
                   SizedBox(height: 12 * s),
                   Text(
                     'Pop the bubbles. Beat your best.',
@@ -105,216 +105,25 @@ class _HeaderStats extends ConsumerWidget {
           glyph: Text('\$',
               style: GoogleFonts.nunito(
                   color: const Color(0xFF7A4D00),
-                  fontSize: 14 * s,
+                  fontSize: 12.5 * s,
                   fontWeight: FontWeight.w900)),
           label: '$coins',
         ),
         SizedBox(width: 8 * s),
         CandyStatPill(
           chipColors: Candy.levelChip,
-          glyph: Icon(Icons.bolt, color: Colors.white, size: 16 * s),
+          glyph: Icon(Icons.bolt, color: Colors.white, size: 14 * s),
           label: 'Lv $level',
         ),
         const Spacer(),
         CandyStatPill(
           chipColors: Candy.livesChip,
-          glyph: Icon(Icons.favorite, color: Colors.white, size: 14 * s),
+          glyph: Icon(Icons.favorite, color: Colors.white, size: 12.5 * s),
           // Always against the absolute bank cap, matching the Shop's
           // "N/100 banked" counter — one max everywhere, no 10-vs-100 confusion.
           label: '$count/${LivesState.maxLives}',
         ),
       ],
-    );
-  }
-}
-
-/// Four glossy bubbles floating in a 184px-tall zone, each bobbing on its own
-/// duration so the cluster never visibly repeats.
-class _BubbleCluster extends StatelessWidget {
-  const _BubbleCluster();
-
-  @override
-  Widget build(BuildContext context) {
-    final s = candyScale(context);
-    return SizedBox(
-      height: 184 * s,
-      width: double.infinity,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Orange main (center) — 132px @ (87,26), ±10px / 5.6s.
-          Positioned(
-            left: 87 * s,
-            top: 26 * s,
-            child: _FloatBubble(
-              size: 132 * s,
-              travel: -10 * s,
-              durationMs: 5600,
-              light: Candy.orangeLight,
-              mid: Candy.orange,
-              dark: Candy.orangeDark,
-              glow: Candy.orange.withValues(alpha: 0.55),
-            ),
-          ),
-          // Pink (left) — 78px @ (10,70), +9px / 4.6s.
-          Positioned(
-            left: 10 * s,
-            top: 70 * s,
-            child: _FloatBubble(
-              size: 78 * s,
-              travel: 9 * s,
-              durationMs: 4600,
-              light: Candy.pinkLight,
-              mid: Candy.pink,
-              dark: Candy.pinkDark,
-              glow: Candy.pink.withValues(alpha: 0.50),
-            ),
-          ),
-          // Mint (right) — 66px @ (right 8, top 86), −6px / 5.2s.
-          Positioned(
-            right: 8 * s,
-            top: 86 * s,
-            child: _FloatBubble(
-              size: 66 * s,
-              travel: -6 * s,
-              durationMs: 5200,
-              light: Candy.mintLight,
-              mid: Candy.mint,
-              dark: Candy.mintDark,
-              glow: Candy.mint.withValues(alpha: 0.50),
-            ),
-          ),
-          // Yellow (small) — 46px @ (152,150), +7px / 4.2s.
-          Positioned(
-            left: 152 * s,
-            top: 150 * s,
-            child: _FloatBubble(
-              size: 46 * s,
-              travel: 7 * s,
-              durationMs: 4200,
-              light: Candy.yellowLight,
-              mid: Candy.yellow,
-              dark: Candy.yellowDark,
-              glow: Candy.yellow.withValues(alpha: 0.50),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A glossy bubble that bobs vertically forever (ping-pong, ease-in-out) to
-/// [travel] at the midpoint of [durationMs].
-class _FloatBubble extends StatefulWidget {
-  const _FloatBubble({
-    required this.size,
-    required this.travel,
-    required this.durationMs,
-    required this.light,
-    required this.mid,
-    required this.dark,
-    required this.glow,
-  });
-
-  final double size;
-  final double travel;
-  final int durationMs;
-  final Color light;
-  final Color mid;
-  final Color dark;
-  final Color glow;
-
-  @override
-  State<_FloatBubble> createState() => _FloatBubbleState();
-}
-
-class _FloatBubbleState extends State<_FloatBubble>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _y;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: widget.durationMs),
-    )..repeat(reverse: true);
-    _y = Tween(begin: 0.0, end: widget.travel).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _y,
-      builder: (context, child) =>
-          Transform.translate(offset: Offset(0, _y.value), child: child),
-      child: Container(
-        width: widget.size,
-        height: widget.size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          // radial-gradient(circle at 34% 26%, #FFF, light 20%, mid 54%, dark)
-          gradient: RadialGradient(
-            center: const Alignment(-0.32, -0.48),
-            radius: 1.0,
-            colors: [Colors.white, widget.light, widget.mid, widget.dark],
-            stops: const [0.0, 0.20, 0.54, 1.0],
-          ),
-          boxShadow: [
-            // Outer accent glow.
-            BoxShadow(
-                color: widget.glow,
-                blurRadius: widget.size * 0.30,
-                spreadRadius: -widget.size * 0.05,
-                offset: Offset(0, widget.size * 0.08)),
-            // inset 5px 5px 12px rgba(255,255,255,.42) — soft top-left sheen.
-            BoxShadow(
-                color: Colors.white.withValues(alpha: 0.20),
-                blurRadius: 6,
-                spreadRadius: -2,
-                offset: const Offset(-3, -3)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Title: "BUBBLE / SPLASH", Baloo 2 800, warm cream with an orange/pink glow
-/// and a subtle dark bottom bevel.
-class _Title extends StatelessWidget {
-  const _Title();
-
-  @override
-  Widget build(BuildContext context) {
-    final s = candyScale(context);
-    return Text(
-      'BUBBLE\nSPLASH',
-      textAlign: TextAlign.center,
-      style: Candy.display(
-        size: 46 * s,
-        height: 0.9,
-        letterSpacing: 1 * s,
-        shadows: [
-          Shadow(
-              color: Candy.orange.withValues(alpha: 0.55), blurRadius: 22 * s),
-          Shadow(
-              color: Candy.pink.withValues(alpha: 0.30), blurRadius: 46 * s),
-          Shadow(
-              color: const Color(0xFF782800).withValues(alpha: 0.40),
-              offset: Offset(0, 3 * s)),
-        ],
-      ),
     );
   }
 }

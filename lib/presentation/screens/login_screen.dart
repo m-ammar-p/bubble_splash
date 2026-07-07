@@ -4,10 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/candy.dart';
 import '../../app/routes.dart';
 import '../../application/auth_controller.dart';
+import '../widgets/google_sign_in_button.dart';
 
 /// First-launch gate: pick "Continue with Google" (progression saves to that
 /// account) or "Play as Guest" (device-local progress). Shown while
 /// [AuthState.decided] is false; both choices land on Home.
+///
+/// Mirrors the Home hero — same [CandyBubbleCluster] logo and glowing
+/// [CandyGameTitle] — so the first screen a player sees is already the game.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -28,7 +32,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       Navigator.of(context).pushReplacementNamed(Routes.home);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign-in cancelled — you can also play as a guest.')),
+        const SnackBar(
+            content:
+                Text('Sign-in cancelled — you can also play as a guest.')),
       );
     }
   }
@@ -47,44 +53,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const Positioned.fill(child: CandyNebulaBackground()),
           SafeArea(
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24 * s),
+              padding: EdgeInsets.fromLTRB(20 * s, 15 * s, 20 * s, 24 * s),
               child: Column(
                 children: [
-                  const Spacer(flex: 3),
-                  // Glossy candy-bubble logo, same recipe as the avatars.
-                  Container(
-                    width: 96 * s,
-                    height: 96 * s,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: candyBubbleGradient(0xFF3DB6FF),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF3DB6FF).withValues(alpha: 0.5),
-                          blurRadius: 30 * s,
-                          offset: Offset(0, 12 * s),
-                        ),
-                      ],
-                    ),
-                    child: Icon(Icons.bubble_chart,
-                        size: 44 * s, color: Colors.white),
-                  ),
-                  SizedBox(height: 18 * s),
-                  Text('Bubble Splash',
-                      style: Candy.display(size: 32 * s, height: 1)),
-                  SizedBox(height: 8 * s),
+                  const Spacer(flex: 2),
+                  // Same hero as Home: floating bubble-cluster logo + glowing
+                  // BUBBLE / SPLASH title.
+                  const CandyBubbleCluster(),
+                  SizedBox(height: 14 * s),
+                  const CandyGameTitle(),
+                  SizedBox(height: 12 * s),
                   Text(
-                    'Pop bubbles, level up, climb the ranks',
+                    'Pop the bubbles. Beat your best.',
                     textAlign: TextAlign.center,
                     style: Candy.ui(
-                      size: 14 * s,
                       color: const Color(0xFFFFE1D2).withValues(alpha: 0.60),
+                      size: 15 * s,
                     ),
                   ),
-                  const Spacer(flex: 4),
-                  _GoogleButton(onPressed: _busy ? null : _signInWithGoogle),
-                  SizedBox(height: 8 * s),
+                  const Spacer(flex: 3),
+                  GoogleSignInButton(
+                      onPressed: _busy ? null : _signInWithGoogle),
+                  SizedBox(height: 10 * s),
                   Text(
                     'Your levels & records save to your account',
                     style: Candy.ui(
@@ -93,20 +83,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   SizedBox(height: 16 * s),
-                  CandyGlass(
-                    radius: 18 * s,
-                    height: 50 * s,
-                    alignment: Alignment.center,
-                    onTap: _busy ? null : _continueAsGuest,
-                    child: Text(
-                      'Play as Guest',
-                      style: Candy.ui(
-                          size: 15.5 * s,
-                          weight: FontWeight.w800,
-                          color: Colors.white.withValues(alpha: 0.85)),
-                    ),
-                  ),
-                  SizedBox(height: 28 * s),
+                  _GuestButton(onPressed: _busy ? null : _continueAsGuest),
                 ],
               ),
             ),
@@ -126,11 +103,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-/// White "Continue with Google" pill per Google's sign-in branding (white
-/// surface, multicolor G, dark label) — deliberately not Candy-orange so it
-/// reads as Google.
-class _GoogleButton extends StatelessWidget {
-  const _GoogleButton({required this.onPressed});
+/// "Play as Guest" glass row styled like Home's Free Life card: mint gradient
+/// chip with a controller icon, bold label + subline, chevron affordance.
+class _GuestButton extends StatelessWidget {
+  const _GuestButton({required this.onPressed});
   final VoidCallback? onPressed;
 
   @override
@@ -138,91 +114,44 @@ class _GoogleButton extends StatelessWidget {
     final s = candyScale(context);
     return Opacity(
       opacity: onPressed == null ? 0.6 : 1,
-      child: GestureDetector(
+      child: CandyGlass(
         onTap: onPressed,
-        child: Container(
-          height: 54 * s,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18 * s),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 24 * s,
-                offset: Offset(0, 10 * s),
+        radius: 18 * s,
+        surfaceAlpha: 0.10,
+        borderAlpha: 0.18,
+        padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 10 * s),
+        child: Row(
+          children: [
+            CandyChip(
+              colors: Candy.mintChip,
+              size: 38 * s,
+              child: Icon(Icons.sports_esports_rounded,
+                  color: Colors.white, size: 20 * s),
+            ),
+            SizedBox(width: 12 * s),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Play as Guest',
+                      style: Candy.ui(size: 15.5 * s, weight: FontWeight.w800)),
+                  SizedBox(height: 1 * s),
+                  Text(
+                    'Progress stays on this device',
+                    style: Candy.ui(
+                      size: 11.5 * s,
+                      color: Colors.white.withValues(alpha: 0.50),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _GoogleG(size: 22 * s),
-              SizedBox(width: 10 * s),
-              Text(
-                'Continue with Google',
-                style: Candy.ui(
-                    size: 15.5 * s,
-                    weight: FontWeight.w800,
-                    color: const Color(0xFF1F1F1F)),
-              ),
-            ],
-          ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: Candy.timer, size: 24 * s),
+          ],
         ),
       ),
     );
   }
 }
 
-/// A drawn multicolor "G" (no asset, no emoji — same tofu-safety rule as
-/// avatars/bombs).
-class _GoogleG extends StatelessWidget {
-  const _GoogleG({required this.size});
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(painter: _GoogleGPainter()),
-    );
-  }
-}
-
-class _GoogleGPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = size.width * 0.20;
-    final rect = Rect.fromLTWH(
-        stroke / 2, stroke / 2, size.width - stroke, size.height - stroke);
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke;
-
-    const deg = 3.14159265 / 180.0;
-    // Four brand-colored arcs approximating the G ring.
-    paint.color = const Color(0xFF4285F4); // blue: right side
-    canvas.drawArc(rect, -45 * deg, 75 * deg, false, paint);
-    paint.color = const Color(0xFF34A853); // green: bottom
-    canvas.drawArc(rect, 45 * deg, 100 * deg, false, paint);
-    paint.color = const Color(0xFFFBBC05); // yellow: bottom-left
-    canvas.drawArc(rect, 145 * deg, 65 * deg, false, paint);
-    paint.color = const Color(0xFFEA4335); // red: top
-    canvas.drawArc(rect, 210 * deg, 105 * deg, false, paint);
-
-    // The G's horizontal bar.
-    final bar = Paint()
-      ..color = const Color(0xFF4285F4)
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt;
-    canvas.drawLine(
-      Offset(size.width / 2 + stroke * 0.2, size.height / 2),
-      Offset(size.width - stroke / 2, size.height / 2),
-      bar,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

@@ -128,6 +128,200 @@ RadialGradient candyBubbleGradient(int colorValue) {
   );
 }
 
+/// The game's logo: four glossy bubbles floating in a 184px-tall zone, each
+/// bobbing on its own duration so the cluster never visibly repeats. Spec:
+/// handoff "Bubble cluster (logo)". Shared by Home and Login.
+class CandyBubbleCluster extends StatelessWidget {
+  const CandyBubbleCluster({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return SizedBox(
+      height: 184 * s,
+      width: double.infinity,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Orange main (center) — 132px @ (87,26), ±10px / 5.6s.
+          Positioned(
+            left: 87 * s,
+            top: 26 * s,
+            child: CandyFloatBubble(
+              size: 132 * s,
+              travel: -10 * s,
+              durationMs: 5600,
+              light: Candy.orangeLight,
+              mid: Candy.orange,
+              dark: Candy.orangeDark,
+              glow: Candy.orange.withValues(alpha: 0.55),
+            ),
+          ),
+          // Pink (left) — 78px @ (10,70), +9px / 4.6s.
+          Positioned(
+            left: 10 * s,
+            top: 70 * s,
+            child: CandyFloatBubble(
+              size: 78 * s,
+              travel: 9 * s,
+              durationMs: 4600,
+              light: Candy.pinkLight,
+              mid: Candy.pink,
+              dark: Candy.pinkDark,
+              glow: Candy.pink.withValues(alpha: 0.50),
+            ),
+          ),
+          // Mint (right) — 66px @ (right 8, top 86), −6px / 5.2s.
+          Positioned(
+            right: 8 * s,
+            top: 86 * s,
+            child: CandyFloatBubble(
+              size: 66 * s,
+              travel: -6 * s,
+              durationMs: 5200,
+              light: Candy.mintLight,
+              mid: Candy.mint,
+              dark: Candy.mintDark,
+              glow: Candy.mint.withValues(alpha: 0.50),
+            ),
+          ),
+          // Yellow (small) — 46px @ (152,150), +7px / 4.2s.
+          Positioned(
+            left: 152 * s,
+            top: 150 * s,
+            child: CandyFloatBubble(
+              size: 46 * s,
+              travel: 7 * s,
+              durationMs: 4200,
+              light: Candy.yellowLight,
+              mid: Candy.yellow,
+              dark: Candy.yellowDark,
+              glow: Candy.yellow.withValues(alpha: 0.50),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A glossy bubble that bobs vertically forever (ping-pong, ease-in-out) to
+/// [travel] at the midpoint of [durationMs].
+class CandyFloatBubble extends StatefulWidget {
+  const CandyFloatBubble({
+    super.key,
+    required this.size,
+    required this.travel,
+    required this.durationMs,
+    required this.light,
+    required this.mid,
+    required this.dark,
+    required this.glow,
+  });
+
+  final double size;
+  final double travel;
+  final int durationMs;
+  final Color light;
+  final Color mid;
+  final Color dark;
+  final Color glow;
+
+  @override
+  State<CandyFloatBubble> createState() => _CandyFloatBubbleState();
+}
+
+class _CandyFloatBubbleState extends State<CandyFloatBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _y;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: widget.durationMs),
+    )..repeat(reverse: true);
+    _y = Tween(begin: 0.0, end: widget.travel).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _y,
+      builder: (context, child) =>
+          Transform.translate(offset: Offset(0, _y.value), child: child),
+      child: Container(
+        width: widget.size,
+        height: widget.size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          // radial-gradient(circle at 34% 26%, #FFF, light 20%, mid 54%, dark)
+          gradient: RadialGradient(
+            center: const Alignment(-0.32, -0.48),
+            radius: 1.0,
+            colors: [Colors.white, widget.light, widget.mid, widget.dark],
+            stops: const [0.0, 0.20, 0.54, 1.0],
+          ),
+          boxShadow: [
+            // Outer accent glow.
+            BoxShadow(
+                color: widget.glow,
+                blurRadius: widget.size * 0.30,
+                spreadRadius: -widget.size * 0.05,
+                offset: Offset(0, widget.size * 0.08)),
+            // inset 5px 5px 12px rgba(255,255,255,.42) — soft top-left sheen.
+            BoxShadow(
+                color: Colors.white.withValues(alpha: 0.20),
+                blurRadius: 6,
+                spreadRadius: -2,
+                offset: const Offset(-3, -3)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Game title "BUBBLE / SPLASH": Baloo 2 800, warm cream with an orange/pink
+/// glow and a subtle dark bottom bevel. Spec size 46px (Home); Login reuses it.
+class CandyGameTitle extends StatelessWidget {
+  const CandyGameTitle({super.key, this.size = 46});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return Text(
+      'BUBBLE\nSPLASH',
+      textAlign: TextAlign.center,
+      style: Candy.display(
+        size: size * s,
+        height: 0.9,
+        letterSpacing: 1 * s,
+        shadows: [
+          Shadow(
+              color: Candy.orange.withValues(alpha: 0.55), blurRadius: 22 * s),
+          Shadow(
+              color: Candy.pink.withValues(alpha: 0.30), blurRadius: 46 * s),
+          Shadow(
+              color: const Color(0xFF782800).withValues(alpha: 0.40),
+              offset: Offset(0, 3 * s)),
+        ],
+      ),
+    );
+  }
+}
+
 /// Layered nebula background: base violet gradient + pink glow (top-left) +
 /// orange glow (top-right). Static (GPU-cheap, never invalidates glass caches).
 class CandyNebulaBackground extends StatelessWidget {
@@ -244,7 +438,10 @@ class CandySectionLabel extends StatelessWidget {
   }
 }
 
-/// 38px glass circle back button (Profile/Shop headers).
+/// 34px glass circle back button (Profile/Shop/Ranks headers). Headers that
+/// center a title against it use [kCandyBackCircleSize] for the spacer.
+const double kCandyBackCircleSize = 34;
+
 class CandyBackCircle extends StatelessWidget {
   const CandyBackCircle({super.key});
 
@@ -252,12 +449,12 @@ class CandyBackCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = candyScale(context);
     return CandyGlass(
-      width: 38 * s,
-      height: 38 * s,
+      width: kCandyBackCircleSize * s,
+      height: kCandyBackCircleSize * s,
       alignment: Alignment.center,
       onTap: () => Navigator.pop(context),
       child: Icon(Icons.arrow_back,
-          size: 17 * s, color: Colors.white.withValues(alpha: 0.85)),
+          size: 15 * s, color: Colors.white.withValues(alpha: 0.85)),
     );
   }
 }
@@ -278,15 +475,15 @@ class CandyStatPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = candyScale(context);
     return CandyGlass(
-      padding: EdgeInsets.fromLTRB(4 * s, 4 * s, 13 * s, 4 * s),
+      padding: EdgeInsets.fromLTRB(3.5 * s, 3.5 * s, 11 * s, 3.5 * s),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CandyChip(colors: chipColors, size: 26 * s, child: glyph),
-          SizedBox(width: 7 * s),
+          CandyChip(colors: chipColors, size: 23 * s, child: glyph),
+          SizedBox(width: 6 * s),
           Text(
             label,
-            style: Candy.ui(size: 14 * s, weight: FontWeight.w800),
+            style: Candy.ui(size: 12.5 * s, weight: FontWeight.w800),
           ),
         ],
       ),

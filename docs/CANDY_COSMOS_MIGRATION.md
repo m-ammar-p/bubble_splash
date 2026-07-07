@@ -165,3 +165,8 @@ unchecked phase.
   the minimal Material theme (Candy-seeded, violet snackbars) moved into `app.dart`. Unused
   template dep `cupertino_icons` dropped from pubspec. Skin/palette system deliberately kept
   (game reads the equipped skin; `buySkin`/`equipSkin` are test-covered, just no Shop UI).
+- 2026-07-08: **header size pass.** Shared `CandyBackCircle` 38→34px (new
+  `kCandyBackCircleSize` const drives the title-centering spacers) and `CandyStatPill`
+  chip 26→23 / label 14→12.5 — shrinks the back button + coins/level/lives pills on
+  Home/Profile/Ranks/Shop headers. Gameplay HUD matched: close circle 38→34, lives pill
+  chip 24→22, score Baloo 28→25, round hearts 21→19. Combo pill and sound toggle unchanged.

@@ -88,12 +88,33 @@ void main() {
   });
 
   group('per-account profiles', () {
-    test('fresh signed-in profile takes the Google display name (tagged)',
-        () async {
+    test('fresh signed-in profile is the Google first name + #tag', () async {
       service.account = _acc1;
       await auth().signInWithGoogle();
       final profile = container.read(profileControllerProvider);
-      expect(profile.name, startsWith('Bubble Player#'));
+      expect(profile.name, matches(RegExp(r'^Bubble#\d{4}$')));
+    });
+
+    test('fresh guest profile is Guest + #tag', () {
+      auth().continueAsGuest();
+      expect(container.read(profileControllerProvider).name,
+          matches(RegExp(r'^Guest#\d{4}$')));
+    });
+
+    test('guests cannot rename; signed-in players can (tag kept)', () async {
+      auth().continueAsGuest();
+      final profiles = container.read(profileControllerProvider.notifier);
+      final guestName = container.read(profileControllerProvider).name;
+      expect(profiles.canRename, isFalse);
+      profiles.rename('Ace');
+      expect(container.read(profileControllerProvider).name, guestName);
+
+      service.account = _acc1;
+      await auth().signInWithGoogle();
+      expect(profiles.canRename, isTrue);
+      profiles.rename('Ace');
+      expect(container.read(profileControllerProvider).name,
+          matches(RegExp(r'^Ace#\d{4}$')));
     });
 
     test('progress follows the account across sign-out/sign-in', () async {
@@ -127,9 +148,8 @@ void main() {
       // A second account gets its own slot too.
       service.account = _acc2;
       await auth().signInWithGoogle();
-      expect(
-          container.read(profileControllerProvider).name,
-          startsWith('Splash Master#'));
+      expect(container.read(profileControllerProvider).name,
+          startsWith('Splash#'));
 
       // Back to guest: the guest record is untouched.
       auth().continueAsGuest();

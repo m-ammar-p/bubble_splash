@@ -100,7 +100,7 @@ class _Header extends StatelessWidget {
       children: [
         const CandyBackCircle(),
         Text('Ranks', style: Candy.display(size: 20 * s)),
-        SizedBox(width: 38 * s),
+        SizedBox(width: kCandyBackCircleSize * s),
       ],
     );
   }
