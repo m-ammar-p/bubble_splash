@@ -116,8 +116,8 @@ class BubbleSplashGame extends FlameGame {
   /// Score multiplier from the current combo (1x, 2x at 5, 3x at 10, …).
   int get multiplier => 1 + combo.value ~/ 5;
 
-  // Transparent so the shared LiquidBackground (and its glowing orbs) shows
-  // through behind the glass bubbles for a cohesive look.
+  // Transparent so the screen's CandyNebulaBackground shows through behind
+  // the candy bubbles.
   @override
   Color backgroundColor() => const Color(0x00000000);
 
