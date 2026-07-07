@@ -158,5 +158,10 @@ unchecked phase.
   Baloo values + Nunito labels; `candyBubbleGradient`/`candyBubbleShades` moved from
   `profile_screen.dart` into `candy.dart` and `PlayerAvatar` now renders the glossy candy
   bubble. Dead legacy files deleted: `glass.dart`, `status_badges.dart` (zero refs — Shop
-  reskin removed the last `CoinBadge` use). **Every screen is now Candy Cosmos**; `theme.dart`
-  remains only for `AppTheme`/`LiquidBackground` (app-level chrome behind legacy-free screens).
+  reskin removed the last `CoinBadge` use). **Every screen is now Candy Cosmos**.
+- 2026-07-07: **post-migration dead-code purge.** `theme.dart` deleted — the `LiquidBackground`
+  orb backdrop was invisible under the screens' opaque `CandyNebulaBackground`s (wasted GPU),
+  taking `AppColors`, `_Orb` and the `activeGameplayCount` gameplay-freeze machinery with it;
+  the minimal Material theme (Candy-seeded, violet snackbars) moved into `app.dart`. Unused
+  template dep `cupertino_icons` dropped from pubspec. Skin/palette system deliberately kept
+  (game reads the equipped skin; `buySkin`/`equipSkin` are test-covered, just no Shop UI).
