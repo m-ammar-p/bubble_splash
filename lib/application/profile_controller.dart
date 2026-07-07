@@ -6,21 +6,29 @@ import '../domain/models/achievement.dart';
 import '../domain/models/bubble_skin.dart';
 import '../domain/models/game_result.dart';
 import '../domain/models/player_profile.dart';
+import 'auth_controller.dart';
 import 'providers.dart';
 
 /// Owns the player's persistent profile and all mutations to it (coins, XP,
 /// stats, skins, achievements). Every mutation persists immediately.
+///
+/// The profile is per-account: watching the auth state means signing in or
+/// out rebuilds this notifier against that account's storage slot, so a
+/// Google account's levels/records follow the account while guest progress
+/// stays in the guest slot.
 class ProfileController extends Notifier<PlayerProfile> {
   @override
   PlayerProfile build() {
-    final repo = ref.read(profileRepositoryProvider);
+    final account = ref.watch(authControllerProvider).account;
+    final repo = ref.watch(profileRepositoryProvider(account?.id));
     final loaded = repo.load();
     if (loaded != null) return loaded;
-    // Fresh player: give a unique, tagged default name and persist it so the
-    // id (and thus the tag) is stable across launches.
+    // Fresh player: give a unique, tagged default name (the Google display
+    // name when signed in) and persist it so the id (and thus the tag) is
+    // stable across launches.
     final id = _newId();
-    final fresh =
-        PlayerProfile.initial(id: id).copyWith(name: _taggedName('Player', id));
+    final fresh = PlayerProfile.initial(id: id)
+        .copyWith(name: _taggedName(account?.displayName ?? 'Player', id));
     repo.save(fresh);
     return fresh;
   }
@@ -36,7 +44,8 @@ class ProfileController extends Notifier<PlayerProfile> {
 
   void _commit(PlayerProfile next) {
     state = next;
-    ref.read(profileRepositoryProvider).save(next);
+    final accountId = ref.read(authControllerProvider).account?.id;
+    ref.read(profileRepositoryProvider(accountId)).save(next);
   }
 
   static String _newId() =>

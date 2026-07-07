@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/candy.dart';
+import '../../app/routes.dart';
+import '../../application/auth_controller.dart';
 import '../../application/profile_controller.dart';
 import '../../domain/models/achievement.dart';
 import '../../domain/models/player_profile.dart';
@@ -69,6 +71,10 @@ class ProfileScreen extends ConsumerWidget {
                                   .contains(a.id),
                             ),
                           ),
+                        SizedBox(height: 5 * s),
+                        const CandySectionLabel('ACCOUNT'),
+                        SizedBox(height: 8 * s),
+                        const _AccountCard(),
                       ],
                     ),
                   ),
@@ -448,6 +454,112 @@ class _AchievementRow extends StatelessWidget {
               child: Icon(Icons.check, size: 14 * s, color: Candy.ctaInk),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// ACCOUNT card: signed-in shows the Google identity + Sign out; guest shows
+/// a "Sign in with Google" action (progression then follows that account —
+/// guest progress stays in the guest slot).
+class _AccountCard extends ConsumerWidget {
+  const _AccountCard();
+
+  Future<void> _signIn(BuildContext context, WidgetRef ref) async {
+    final ok =
+        await ref.read(authControllerProvider.notifier).signInWithGoogle();
+    if (!context.mounted) return;
+    if (ok) {
+      final account = ref.read(authControllerProvider).account;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Signed in as ${account?.email}')),
+      );
+    }
+  }
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showCandyConfirmDialog(
+      context,
+      chipColors: Candy.levelChip,
+      icon: Icons.logout,
+      title: 'Sign out?',
+      body: 'Your progress stays saved to this account. '
+          'You can sign back in anytime.',
+      confirmLabel: 'Sign out',
+    );
+    if (!confirmed || !context.mounted) return;
+    await ref.read(authControllerProvider.notifier).signOut();
+    if (!context.mounted) return;
+    Navigator.of(context)
+        .pushNamedAndRemoveUntil(Routes.login, (route) => false);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = candyScale(context);
+    final auth = ref.watch(authControllerProvider);
+    final account = auth.account;
+
+    return CandyGlass(
+      radius: 16 * s,
+      surfaceAlpha: 0.08,
+      borderAlpha: 0.14,
+      padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 11 * s),
+      child: Row(
+        children: [
+          // White circle + Google-blue G (drawn glyph-safe: Latin letter, not
+          // an emoji).
+          Container(
+            width: 34 * s,
+            height: 34 * s,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+            ),
+            child: Text('G',
+                style: Candy.display(
+                    size: 18 * s, color: const Color(0xFF4285F4), height: 1)),
+          ),
+          SizedBox(width: 10 * s),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  account?.displayName ?? 'Guest player',
+                  style: Candy.ui(size: 14 * s, weight: FontWeight.w800),
+                ),
+                SizedBox(height: 1 * s),
+                Text(
+                  account?.email ?? 'Progress is saved on this device only',
+                  style: Candy.ui(
+                      size: 11.5 * s,
+                      color: Colors.white.withValues(alpha: 0.55)),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8 * s),
+          CandyGlass(
+            padding:
+                EdgeInsets.symmetric(horizontal: 13 * s, vertical: 8 * s),
+            surfaceAlpha: 0.12,
+            borderAlpha: 0.20,
+            onTap: () => account == null
+                ? _signIn(context, ref)
+                : _signOut(context, ref),
+            child: Text(
+              account == null ? 'Sign in' : 'Sign out',
+              style: Candy.ui(
+                  size: 12.5 * s,
+                  weight: FontWeight.w800,
+                  color: account == null
+                      ? Candy.orangeLight
+                      : Colors.white.withValues(alpha: 0.85)),
+            ),
+          ),
         ],
       ),
     );

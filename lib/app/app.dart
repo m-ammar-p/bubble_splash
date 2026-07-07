@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../application/auth_controller.dart';
 import '../application/providers.dart';
 import 'candy.dart';
 import 'routes.dart';
@@ -10,12 +11,16 @@ class BubbleSplashApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Auth gate: fresh installs land on the login screen, returning players
+    // go straight home. Only the first build matters (initialRoute is read
+    // once); later auth changes navigate explicitly (login/sign-out flows).
+    final decided = ref.watch(authControllerProvider).decided;
     return MaterialApp(
       title: 'Bubble Splash',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
       navigatorKey: ref.watch(navigatorKeyProvider),
-      initialRoute: Routes.home,
+      initialRoute: decided ? Routes.home : Routes.login,
       onGenerateRoute: Routes.onGenerateRoute,
     );
   }
