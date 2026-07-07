@@ -146,3 +146,17 @@ unchecked phase.
   `showCandyConfirmDialog` in `candy.dart` (violet sheet, icon chip, orange CTA) — exactly one
   popup per purchase; `FakePurchaseService` no longer shows its own dialog. `flutter analyze`
   clean, all 36 tests pass; verified live on emulator-5554 in profile mode (avg 3–6ms/frame).
+- 2026-07-07: **Shop reskinned to Candy Cosmos** (`shop_screen.dart` rewrite: nebula bg,
+  glass header + coin pill, GET COINS / LIVES sections, glass pack cards w/ gradient chips +
+  orange CTA buys; purchase logic untouched). Dedupe pass extracted `CandySectionLabel`,
+  `CandyStatPill`, `CandyBackCircle` into `candy.dart` (shop/profile/home now share them).
+  Verified on emulator (layout, confirm dialog, disabled packs).
+- 2026-07-07: **Ranks (leaderboard) reskinned to Candy Cosmos** in two phases.
+  Phase 1 chrome: nebula bg, shared header, `_CandyTabs` glass segmented control (one
+  generic widget for metric + scope, replaces both Material SegmentedButtons). Phase 2 rows:
+  glass cards, gold Baloo rank for top 3, amber "unlocked"-style tint on the player's row,
+  Baloo values + Nunito labels; `candyBubbleGradient`/`candyBubbleShades` moved from
+  `profile_screen.dart` into `candy.dart` and `PlayerAvatar` now renders the glossy candy
+  bubble. Dead legacy files deleted: `glass.dart`, `status_badges.dart` (zero refs — Shop
+  reskin removed the last `CoinBadge` use). **Every screen is now Candy Cosmos**; `theme.dart`
+  remains only for `AppTheme`/`LiquidBackground` (app-level chrome behind legacy-free screens).

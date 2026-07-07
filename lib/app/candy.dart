@@ -93,6 +93,41 @@ abstract final class Candy {
 /// Proportional scale from the 322px-wide design frame to the real screen.
 double candyScale(BuildContext context) => MediaQuery.sizeOf(context).width / 322.0;
 
+/// Exact light/dark trios from the handoff for the six avatar swatch colors;
+/// arbitrary (legacy) colors fall back to an HSL derivation, same as the game
+/// bubbles.
+const _knownBubbleShades = <int, (Color, Color)>{
+  0xFF3DB6FF: (Color(0xFFBFEAFF), Color(0xFF0F6EC2)),
+  0xFF8A5BFF: (Candy.violetLight, Candy.violetDark),
+  0xFFFF9D3D: (Candy.orangeLight, Candy.orangeDark),
+  0xFF4BE0A5: (Candy.mintLight, Candy.mintDark),
+  0xFFFFD93D: (Candy.yellowLight, Candy.yellowDark),
+  0xFFFF6B8B: (Candy.pinkLight, Candy.pinkDark),
+};
+
+(Color light, Color dark) candyBubbleShades(int colorValue) {
+  final known = _knownBubbleShades[colorValue];
+  if (known != null) return known;
+  final hsl = HSLColor.fromColor(Color(colorValue));
+  return (
+    hsl.withLightness((hsl.lightness + 0.20).clamp(0.0, 1.0)).toColor(),
+    hsl.withLightness((hsl.lightness - 0.24).clamp(0.0, 1.0)).toColor(),
+  );
+}
+
+/// The glossy candy-bubble gradient (avatars, picker tiles, swatches): white
+/// specular → light → mid → dark.
+RadialGradient candyBubbleGradient(int colorValue) {
+  final mid = Color(colorValue);
+  final (light, dark) = candyBubbleShades(colorValue);
+  return RadialGradient(
+    center: const Alignment(-0.32, -0.48),
+    radius: 1.0,
+    colors: [Colors.white, light, mid, dark],
+    stops: const [0.0, 0.20, 0.54, 1.0],
+  );
+}
+
 /// Layered nebula background: base violet gradient + pink glow (top-left) +
 /// orange glow (top-right). Static (GPU-cheap, never invalidates glass caches).
 class CandyNebulaBackground extends StatelessWidget {

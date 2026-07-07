@@ -17,8 +17,8 @@ const Map<String, IconData> _achievementIcons = {
   'palette': Icons.palette,
 };
 
-/// The avatar color swatches (spec screen 07). Each stores the mid color on the
-/// profile; light/dark shades for the gloss are looked up in [_shadesFor].
+/// The avatar color swatches (spec screen 07). Each stores the mid color on
+/// the profile; gloss shades come from [candyBubbleShades] in candy.dart.
 const _swatchColors = [
   0xFF3DB6FF, // blue
   0xFF8A5BFF, // violet
@@ -27,40 +27,6 @@ const _swatchColors = [
   0xFFFFD93D, // yellow
   0xFFFF6B8B, // pink
 ];
-
-/// Exact light/dark trios from the handoff for the known swatches; arbitrary
-/// (legacy) colors fall back to an HSL derivation, same as the game bubbles.
-const _knownShades = <int, (Color, Color)>{
-  0xFF3DB6FF: (Color(0xFFBFEAFF), Color(0xFF0F6EC2)),
-  0xFF8A5BFF: (Candy.violetLight, Candy.violetDark),
-  0xFFFF9D3D: (Candy.orangeLight, Candy.orangeDark),
-  0xFF4BE0A5: (Candy.mintLight, Candy.mintDark),
-  0xFFFFD93D: (Candy.yellowLight, Candy.yellowDark),
-  0xFFFF6B8B: (Candy.pinkLight, Candy.pinkDark),
-};
-
-(Color light, Color dark) _shadesFor(int colorValue) {
-  final known = _knownShades[colorValue];
-  if (known != null) return known;
-  final hsl = HSLColor.fromColor(Color(colorValue));
-  return (
-    hsl.withLightness((hsl.lightness + 0.20).clamp(0.0, 1.0)).toColor(),
-    hsl.withLightness((hsl.lightness - 0.24).clamp(0.0, 1.0)).toColor(),
-  );
-}
-
-/// The glossy candy-bubble gradient used by the avatar, picker tiles and
-/// swatches: white specular at 34%/26% → light → mid → dark.
-RadialGradient _bubbleGradient(int colorValue) {
-  final mid = Color(colorValue);
-  final (light, dark) = _shadesFor(colorValue);
-  return RadialGradient(
-    center: const Alignment(-0.32, -0.48),
-    radius: 1.0,
-    colors: [Colors.white, light, mid, dark],
-    stops: const [0.0, 0.20, 0.54, 1.0],
-  );
-}
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -160,7 +126,7 @@ class _AvatarBlock extends ConsumerWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: _bubbleGradient(profile.avatarColor),
+                    gradient: candyBubbleGradient(profile.avatarColor),
                     boxShadow: [
                       // 0 12px 30px <color .5>
                       BoxShadow(
@@ -614,7 +580,7 @@ class _AvatarTile extends StatelessWidget {
         decoration: selected
             ? BoxDecoration(
                 borderRadius: BorderRadius.circular(14 * s),
-                gradient: _bubbleGradient(color),
+                gradient: candyBubbleGradient(color),
                 border: Border.all(
                     color: Colors.white.withValues(alpha: 0.55),
                     width: 1.5 * s),
@@ -662,7 +628,7 @@ class _ColorSwatch extends StatelessWidget {
         height: 34 * s,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          gradient: _bubbleGradient(color),
+          gradient: candyBubbleGradient(color),
           boxShadow: selected
               ? [
                   BoxShadow(

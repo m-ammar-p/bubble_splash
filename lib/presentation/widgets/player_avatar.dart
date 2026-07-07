@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/candy.dart';
+
 /// Avatar choices, keyed by a stable string stored on the profile. We render a
 /// Material **icon** (not an emoji) so avatars display reliably on every device
 /// — older Androids often lack a color-emoji font and show blank "tofu" boxes.
@@ -26,7 +28,8 @@ const List<String> kAvatarKeys = [
 /// keys (e.g. legacy profiles that stored an emoji string).
 IconData avatarIconFor(String key) => kAvatarIcons[key] ?? Icons.bubble_chart;
 
-/// A circular avatar: a colored disc with a Material icon centered on it.
+/// A circular avatar: a glossy candy bubble in the player's color with a
+/// Material icon centered on it (same gloss recipe as the Profile avatar).
 class PlayerAvatar extends StatelessWidget {
   const PlayerAvatar({
     super.key,
@@ -47,11 +50,11 @@ class PlayerAvatar extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Color(color).withValues(alpha: 0.25),
         shape: BoxShape.circle,
-        border: Border.all(color: Color(color), width: 2),
+        gradient: candyBubbleGradient(color),
       ),
-      child: Icon(avatarIconFor(iconKey), color: Color(color), size: size * 0.55),
+      child: Icon(avatarIconFor(iconKey),
+          color: Colors.white, size: size * 0.5),
     );
   }
 }

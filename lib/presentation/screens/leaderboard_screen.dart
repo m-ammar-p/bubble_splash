@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/leaderboard_controller.dart';
 import '../../app/candy.dart';
-import '../../app/theme.dart';
 import '../../domain/models/leaderboard_entry.dart';
-import '../widgets/glass.dart';
 import '../widgets/player_avatar.dart';
 
 /// Ranks: two-metric leaderboard (Top Score / Total Pops × Local / Global),
@@ -183,6 +181,9 @@ class _CandyTabs<T> extends StatelessWidget {
   }
 }
 
+/// Rank row: rank number (gold Baloo for top 3), glossy bubble avatar, name +
+/// level, metric value. The player's own row gets the amber "unlocked" tint
+/// used by Profile achievements.
 class _LeaderboardRow extends StatelessWidget {
   const _LeaderboardRow({required this.entry, required this.metric});
   final LeaderboardEntry entry;
@@ -190,76 +191,93 @@ class _LeaderboardRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = candyScale(context);
     final me = entry.isCurrentPlayer;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: GlassPanel(
-        radius: 14,
-        blur: 14,
-        shadow: false,
-        tint: me ? AppColors.accent : Colors.white,
-        borderColor: me ? AppColors.accent : null,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 34,
-              child: Text(
-                '#${entry.rank}',
-                style: TextStyle(
-                  color: entry.rank <= 3 ? AppColors.gold : Colors.white70,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+    return Container(
+      margin: EdgeInsets.only(bottom: 8 * s),
+      padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 9 * s),
+      decoration: BoxDecoration(
+        color: me
+            ? const Color(0x1FFFC24D) // rgba(255,194,77,.12)
+            : Candy.glass(0.08),
+        borderRadius: BorderRadius.circular(16 * s),
+        border: Border.all(
+          color: me
+              ? const Color(0x80FFC24D) // rgba(255,194,77,.5)
+              : Candy.glassBorder(0.14),
+        ),
+        boxShadow: me
+            ? [
+                BoxShadow(
+                    color: Candy.orange.withValues(alpha: 0.15),
+                    blurRadius: 16 * s),
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 30 * s,
+            child: Text(
+              '#${entry.rank}',
+              style: Candy.display(
+                size: 15 * s,
+                height: 1,
+                color: entry.rank <= 3
+                    ? Candy.yellow
+                    : Colors.white.withValues(alpha: 0.65),
               ),
             ),
-            const SizedBox(width: 8),
-            PlayerAvatar(
-                iconKey: entry.avatarEmoji,
-                color: entry.avatarColor,
-                size: 38),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    me ? '${entry.name} (You)' : entry.name,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: me ? FontWeight.bold : FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    'Lv ${entry.level}',
-                    style: const TextStyle(
-                        color: Colors.white54, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+          ),
+          SizedBox(width: 7 * s),
+          PlayerAvatar(
+              iconKey: entry.avatarEmoji,
+              color: entry.avatarColor,
+              size: 36 * s),
+          SizedBox(width: 10 * s),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${entry.valueFor(metric)}',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16),
+                  me ? '${entry.name} (You)' : entry.name,
+                  style: Candy.ui(
+                      size: 13.5 * s,
+                      weight: FontWeight.w800,
+                      color: me ? Candy.titleText : Colors.white),
+                  overflow: TextOverflow.ellipsis,
                 ),
+                SizedBox(height: 1 * s),
                 Text(
-                  metric == LeaderboardMetric.highScore ? 'pts' : 'pops',
-                  style: const TextStyle(color: Colors.white38, fontSize: 11),
+                  'Lv ${entry.level}',
+                  style: Candy.ui(
+                      size: 11 * s,
+                      color: Colors.white.withValues(alpha: 0.55)),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          SizedBox(width: 8 * s),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${entry.valueFor(metric)}',
+                style: Candy.display(
+                    size: 16 * s, color: Colors.white, height: 1),
+              ),
+              SizedBox(height: 1 * s),
+              Text(
+                metric == LeaderboardMetric.highScore ? 'pts' : 'pops',
+                style: Candy.ui(
+                    size: 10.5 * s,
+                    color: Colors.white.withValues(alpha: 0.4)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
