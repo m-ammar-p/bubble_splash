@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/leaderboard_controller.dart';
+import '../../app/candy.dart';
 import '../../app/theme.dart';
 import '../../domain/models/leaderboard_entry.dart';
 import '../widgets/glass.dart';
 import '../widgets/player_avatar.dart';
 
+/// Ranks: two-metric leaderboard (Top Score / Total Pops × Local / Global),
+/// skinned to Candy Cosmos with the shared header/tab/card structure.
 class LeaderboardScreen extends ConsumerStatefulWidget {
   const LeaderboardScreen({super.key});
 
@@ -22,62 +25,158 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
   Widget build(BuildContext context) {
     final entries =
         ref.watch(leaderboardProvider((scope: _scope, metric: _metric)));
+    final s = candyScale(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Leaderboard')),
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: SegmentedButton<LeaderboardMetric>(
-              segments: const [
-                ButtonSegment(
-                    value: LeaderboardMetric.highScore,
-                    label: Text('Top Score'),
-                    icon: Icon(Icons.emoji_events)),
-                ButtonSegment(
-                    value: LeaderboardMetric.totalPops,
-                    label: Text('Total Pops'),
-                    icon: Icon(Icons.bubble_chart)),
-              ],
-              selected: {_metric},
-              onSelectionChanged: (s) => setState(() => _metric = s.first),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: SegmentedButton<LeaderboardScope>(
-              segments: const [
-                ButtonSegment(
-                    value: LeaderboardScope.local,
-                    label: Text('Local'),
-                    icon: Icon(Icons.location_on)),
-                ButtonSegment(
-                    value: LeaderboardScope.global,
-                    label: Text('Global'),
-                    icon: Icon(Icons.public)),
-              ],
-              selected: {_scope},
-              onSelectionChanged: (s) => setState(() => _scope = s.first),
-            ),
-          ),
-          Expanded(
-            child: entries.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Text('Could not load leaderboard\n$e',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white54)),
+          const Positioned.fill(child: CandyNebulaBackground()),
+          SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16 * s, 10 * s, 16 * s, 0),
+              child: Column(
+                children: [
+                  const _Header(),
+                  SizedBox(height: 14 * s),
+                  _CandyTabs<LeaderboardMetric>(
+                    selected: _metric,
+                    onChanged: (m) => setState(() => _metric = m),
+                    tabs: const {
+                      LeaderboardMetric.highScore:
+                          (Icons.emoji_events, 'Top Score'),
+                      LeaderboardMetric.totalPops:
+                          (Icons.bubble_chart, 'Total Pops'),
+                    },
+                  ),
+                  SizedBox(height: 8 * s),
+                  _CandyTabs<LeaderboardScope>(
+                    selected: _scope,
+                    onChanged: (sc) => setState(() => _scope = sc),
+                    tabs: const {
+                      LeaderboardScope.local: (Icons.location_on, 'Local'),
+                      LeaderboardScope.global: (Icons.public, 'Global'),
+                    },
+                  ),
+                  SizedBox(height: 12 * s),
+                  Expanded(
+                    child: entries.when(
+                      loading: () => const Center(
+                        child:
+                            CircularProgressIndicator(color: Candy.orange),
+                      ),
+                      error: (e, _) => Center(
+                        child: Text('Could not load leaderboard\n$e',
+                            textAlign: TextAlign.center,
+                            style: Candy.ui(
+                                size: 13 * s,
+                                color:
+                                    Colors.white.withValues(alpha: 0.55))),
+                      ),
+                      data: (list) => ListView.builder(
+                        padding: EdgeInsets.only(bottom: 20 * s),
+                        itemCount: list.length,
+                        itemBuilder: (_, i) =>
+                            _LeaderboardRow(entry: list[i], metric: _metric),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              data: (list) => ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: list.length,
-                itemBuilder: (_, i) =>
-                    _LeaderboardRow(entry: list[i], metric: _metric),
-              ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Glass back circle · centered "Ranks" title · width-matched spacer.
+class _Header extends StatelessWidget {
+  const _Header();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const CandyBackCircle(),
+        Text('Ranks', style: Candy.display(size: 20 * s)),
+        SizedBox(width: 38 * s),
+      ],
+    );
+  }
+}
+
+/// Glass segmented control: equal-width tabs in a pill track; the selected tab
+/// gets the orange CTA gradient + ink text, unselected are translucent white.
+class _CandyTabs<T> extends StatelessWidget {
+  const _CandyTabs({
+    required this.selected,
+    required this.onChanged,
+    required this.tabs,
+  });
+
+  final T selected;
+  final ValueChanged<T> onChanged;
+
+  /// Value → (icon, label), in display order.
+  final Map<T, (IconData, String)> tabs;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return CandyGlass(
+      radius: 999,
+      surfaceAlpha: 0.08,
+      borderAlpha: 0.14,
+      padding: EdgeInsets.all(3 * s),
+      child: Row(
+        children: [
+          for (final MapEntry(key: value, value: (icon, label))
+              in tabs.entries)
+            Expanded(
+              child: GestureDetector(
+                onTap: () => onChanged(value),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  curve: Curves.easeOut,
+                  height: 34 * s,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    gradient: value == selected
+                        ? const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Candy.orangeCtaTop,
+                              Candy.orangeCtaBottom
+                            ],
+                          )
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon,
+                          size: 15 * s,
+                          color: value == selected
+                              ? Candy.ctaInk
+                              : Colors.white.withValues(alpha: 0.65)),
+                      SizedBox(width: 6 * s),
+                      Text(label,
+                          style: Candy.ui(
+                              size: 12.5 * s,
+                              weight: FontWeight.w800,
+                              color: value == selected
+                                  ? Candy.ctaInk
+                                  : Colors.white
+                                      .withValues(alpha: 0.75))),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
