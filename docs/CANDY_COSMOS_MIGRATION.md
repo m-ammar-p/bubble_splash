@@ -165,6 +165,18 @@ unchecked phase.
   the minimal Material theme (Candy-seeded, violet snackbars) moved into `app.dart`. Unused
   template dep `cupertino_icons` dropped from pubspec. Skin/palette system deliberately kept
   (game reads the equipped skin; `buySkin`/`equipSkin` are test-covered, just no Shop UI).
+- 2026-07-08: **Login screen skinned to the Home hero + guest gates.** Login now shares
+  Home's hero: `_BubbleCluster`/`_FloatBubble` and the glowing title were promoted from
+  `home_screen.dart` into `candy.dart` as `CandyBubbleCluster`/`CandyFloatBubble`/
+  `CandyGameTitle` (Home uses them too). New `presentation/widgets/google_sign_in_button.dart`:
+  `GoogleSignInButton` (white pill, press-down like the CTA), `GoogleG` (official multicolor
+  G drawn from the brand's exact 24×24 vector paths — replaced the old approximate arcs),
+  and `showGoogleSignInDialog` (violet sheet, white G badge, "Not now" escape). "Play as
+  Guest" upgraded from a plain glass pill to a Free-Life-card-style row (mint gamepad chip,
+  subline, chevron). Guest gates: coin (real-money) packs prompt sign-in at tap and continue
+  into the purchase after; a guest's name tap opens the sign-in prompt instead of the name
+  editor (`rename` also guards via `canRename`). Names: `Guest#tag` / Google first name +
+  `#tag`.
 - 2026-07-08: **header size pass.** Shared `CandyBackCircle` 38→34px (new
   `kCandyBackCircleSize` const drives the title-centering spacers) and `CandyStatPill`
   chip 26→23 / label 14→12.5 — shrinks the back button + coins/level/lives pills on
