@@ -8,7 +8,7 @@ Bubble Splash is a Flutter game with a Flame-powered core and a full meta-game a
 
 **Economy model (important — easy to get wrong, was deliberately changed):** Play is **always free**; lives never gate starting a round. A life is an in-round **continue**: when round HP depletes the player spends a banked life (or watches an ad) to revive. Every life source — passive regen (1 per 30 min, timestamp-based), the **Free Life** ad claim (`FreeLifeController`, 30-min cooldown), in-round rewarded ads, and Shop **life packs** (`kLifePacks`, bought with coins via `LivesController.addLives`) — banks up to the **single** `LivesState.maxLives` cap (100). A two-cap design (free ceiling 10 + purchase cap 100) was tried and **deliberately reverted** — it confused players; don't reintroduce it. Purchase rules: a life pack must fit *entirely* under the cap or it's refused un-charged (never sell a clamped partial fill), every purchase (coins **and** lives) goes through a confirmation dialog, and ad offers (home Free Life card, continue-sheet ad button) are disabled while the bank is full. `spendLife` from a full bank re-anchors the regen clock (see `lives_controller_test.dart` — dropping below the cap must not instantly refill from a stale timestamp). **Coins are NOT earned by playing** — they're a *purchasable* currency (`PurchaseService`, fake impl now / RevenueCat later) spent on Shop **life packs**. Bubble skins are no longer sold in the Shop (the skin/palette system still exists in code and the game reads the equipped skin; there's just no purchase UI). A round grants XP/progression only.
 
-**Key docs:** `docs/design/candy_cosmos_handoff.md` — the pixel-level UI spec (source of truth for any visual work on Home/Gameplay/Get Ready/Keep Going/Round Over); `docs/CANDY_COSMOS_MIGRATION.md` — the UI-migration log (what's done, what's pending, per-file change history).
+**Key docs:** `docs/design/candy_cosmos_handoff.md` — the pixel-level UI spec (source of truth for any visual work on Home/Gameplay/Get Ready/Keep Going/Round Over); `docs/CANDY_COSMOS_MIGRATION.md` — the UI-migration log (what's done, what's pending, per-file change history); `PERF_NOTES.md` — the (completed) gameplay-perf/touch pass checklist whose fixes are summarized in the gotchas below.
 
 ## Commands
 
@@ -23,6 +23,8 @@ dart run tool/gen_audio.dart    # regenerate assets/audio/*.wav sound effects
 adb -s emulator-5554 shell pm clear com.bubblesplash.game   # wipe saved state (profile/lives/free-life) to verify a fresh install
 adb -s emulator-5554 exec-out screencap -p > shot.png        # headless visual check; `adb shell input tap X Y` drives the UI (screen 1440x3120)
 ```
+
+`pubspec.yaml` pins `audioplayers_android` to the audioplayers git `main` branch via `dependency_overrides` (added alongside the economy rework; the reason isn't recorded — assume the then-released plugin was broken for this setup). `flutter pub get` therefore needs network access to GitHub, and the override shouldn't be dropped without verifying a full Android build against the released plugin.
 
 After changing pure Dart/Flutter code, hot reload (`r` in the `flutter run` session) is enough. Adding a **dependency or asset** requires a full restart (`flutter run` again), not hot reload. All persistent state lives in `SharedPreferences` (keys `profile`/`lives`/`free_life`); `pm clear` (above) is the way to reset to a brand-new-player state for manual verification.
 
