@@ -88,11 +88,11 @@ class ProfileScreen extends ConsumerWidget {
                         SizedBox(height: 12 * s),
                         _XpCard(profile: profile),
                         SizedBox(height: 13 * s),
-                        const _SectionLabel('STATS'),
+                        const CandySectionLabel('STATS'),
                         SizedBox(height: 8 * s),
                         _StatsGrid(profile: profile),
                         SizedBox(height: 13 * s),
-                        const _SectionLabel('ACHIEVEMENTS'),
+                        const CandySectionLabel('ACHIEVEMENTS'),
                         SizedBox(height: 8 * s),
                         for (final a in kAchievements)
                           Padding(
@@ -126,14 +126,7 @@ class _Header extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        CandyGlass(
-          width: 38 * s,
-          height: 38 * s,
-          alignment: Alignment.center,
-          onTap: () => Navigator.pop(context),
-          child: Icon(Icons.arrow_back,
-              size: 17 * s, color: Colors.white.withValues(alpha: 0.85)),
-        ),
+        const CandyBackCircle(),
         Text('Profile', style: Candy.display(size: 20 * s)),
         SizedBox(width: 38 * s),
       ],
@@ -289,22 +282,6 @@ class _XpCard extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = candyScale(context);
-    return Text(text,
-        style: Candy.ui(
-            size: 12 * s,
-            weight: FontWeight.w800,
-            letterSpacing: 2.5 * s,
-            color: const Color(0x8CFFE1D2)));
   }
 }
 

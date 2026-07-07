@@ -191,6 +191,74 @@ class CandyGlass extends StatelessWidget {
   }
 }
 
+/// Small all-caps spaced section heading (Profile's STATS/ACHIEVEMENTS, the
+/// Shop's GET COINS/LIVES).
+class CandySectionLabel extends StatelessWidget {
+  const CandySectionLabel(this.text, {super.key});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return Text(text,
+        style: Candy.ui(
+            size: 12 * s,
+            weight: FontWeight.w800,
+            letterSpacing: 2.5 * s,
+            color: const Color(0x8CFFE1D2)));
+  }
+}
+
+/// 38px glass circle back button (Profile/Shop headers).
+class CandyBackCircle extends StatelessWidget {
+  const CandyBackCircle({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return CandyGlass(
+      width: 38 * s,
+      height: 38 * s,
+      alignment: Alignment.center,
+      onTap: () => Navigator.pop(context),
+      child: Icon(Icons.arrow_back,
+          size: 17 * s, color: Colors.white.withValues(alpha: 0.85)),
+    );
+  }
+}
+
+/// Glass pill with a gradient icon chip + bold label (Home header stats, the
+/// Shop's coin balance).
+class CandyStatPill extends StatelessWidget {
+  const CandyStatPill(
+      {super.key,
+      required this.chipColors,
+      required this.glyph,
+      required this.label});
+  final List<Color> chipColors;
+  final Widget glyph;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = candyScale(context);
+    return CandyGlass(
+      padding: EdgeInsets.fromLTRB(4 * s, 4 * s, 13 * s, 4 * s),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CandyChip(colors: chipColors, size: 26 * s, child: glyph),
+          SizedBox(width: 7 * s),
+          Text(
+            label,
+            style: Candy.ui(size: 14 * s, weight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Radial-gradient icon chip (the 24–56px circles inside pills/cards).
 class CandyChip extends StatelessWidget {
   const CandyChip({

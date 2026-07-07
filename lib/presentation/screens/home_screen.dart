@@ -100,7 +100,7 @@ class _HeaderStats extends ConsumerWidget {
 
     return Row(
       children: [
-        _StatPill(
+        CandyStatPill(
           chipColors: Candy.coinsChip,
           glyph: Text('\$',
               style: GoogleFonts.nunito(
@@ -110,13 +110,13 @@ class _HeaderStats extends ConsumerWidget {
           label: '$coins',
         ),
         SizedBox(width: 8 * s),
-        _StatPill(
+        CandyStatPill(
           chipColors: Candy.levelChip,
           glyph: Icon(Icons.bolt, color: Colors.white, size: 16 * s),
           label: 'Lv $level',
         ),
         const Spacer(),
-        _StatPill(
+        CandyStatPill(
           chipColors: Candy.livesChip,
           glyph: Icon(Icons.favorite, color: Colors.white, size: 14 * s),
           // Always against the absolute bank cap, matching the Shop's
@@ -124,35 +124,6 @@ class _HeaderStats extends ConsumerWidget {
           label: '$count/${LivesState.maxLives}',
         ),
       ],
-    );
-  }
-}
-
-/// Glass stat pill: translucent white surface, 26px radial-gradient icon chip,
-/// Nunito 800 white label.
-class _StatPill extends StatelessWidget {
-  const _StatPill(
-      {required this.chipColors, required this.glyph, required this.label});
-  final List<Color> chipColors;
-  final Widget glyph;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = candyScale(context);
-    return CandyGlass(
-      padding: EdgeInsets.fromLTRB(4 * s, 4 * s, 13 * s, 4 * s),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CandyChip(colors: chipColors, size: 26 * s, child: glyph),
-          SizedBox(width: 7 * s),
-          Text(
-            label,
-            style: Candy.ui(size: 14 * s, weight: FontWeight.w800),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -37,7 +37,7 @@ class ShopScreen extends ConsumerWidget {
                     child: ListView(
                       padding: EdgeInsets.only(top: 14 * s, bottom: 20 * s),
                       children: [
-                        const _SectionLabel('GET COINS'),
+                        const CandySectionLabel('GET COINS'),
                         SizedBox(height: 4 * s),
                         Text('Buy coins to stock up on lives below.',
                             style: Candy.ui(
@@ -78,7 +78,7 @@ class ShopScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.baseline,
                           textBaseline: TextBaseline.alphabetic,
                           children: [
-                            const _SectionLabel('LIVES'),
+                            const CandySectionLabel('LIVES'),
                             const Spacer(),
                             Text(
                                 '${lives.count}/${LivesState.maxLives} banked',
@@ -235,56 +235,20 @@ class _Header extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Text('Shop', style: Candy.display(size: 20 * s)),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: CandyGlass(
-              width: 38 * s,
-              height: 38 * s,
-              alignment: Alignment.center,
-              onTap: () => Navigator.pop(context),
-              child: Icon(Icons.arrow_back,
-                  size: 17 * s, color: Colors.white.withValues(alpha: 0.85)),
-            ),
-          ),
+          const Align(
+              alignment: Alignment.centerLeft, child: CandyBackCircle()),
           Align(
             alignment: Alignment.centerRight,
-            child: CandyGlass(
-              padding: EdgeInsets.fromLTRB(4 * s, 4 * s, 13 * s, 4 * s),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CandyChip(
-                    colors: Candy.coinsChip,
-                    size: 26 * s,
-                    child: Icon(Icons.monetization_on,
-                        size: 15 * s, color: const Color(0xFF7A5300)),
-                  ),
-                  SizedBox(width: 7 * s),
-                  Text('$coins',
-                      style: Candy.ui(size: 14 * s, weight: FontWeight.w800)),
-                ],
-              ),
+            child: CandyStatPill(
+              chipColors: Candy.coinsChip,
+              glyph: Icon(Icons.monetization_on,
+                  size: 15 * s, color: const Color(0xFF7A5300)),
+              label: '$coins',
             ),
           ),
         ],
       ),
     );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = candyScale(context);
-    return Text(text,
-        style: Candy.ui(
-            size: 12 * s,
-            weight: FontWeight.w800,
-            letterSpacing: 2.5 * s,
-            color: const Color(0x8CFFE1D2)));
   }
 }
 
