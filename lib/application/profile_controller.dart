@@ -14,8 +14,8 @@ import 'providers.dart';
 /// stats, skins, achievements). Every mutation persists immediately.
 ///
 /// The profile is per-account: watching the auth state means signing in or
-/// out rebuilds this notifier against that account's storage slot, so a
-/// Google account's levels/records follow the account while guest progress
+/// out rebuilds this notifier against that account's storage slot, so an
+/// account's levels/records follow the account while guest progress
 /// stays in the guest slot.
 class ProfileController extends Notifier<PlayerProfile> {
   @override
@@ -24,7 +24,7 @@ class ProfileController extends Notifier<PlayerProfile> {
     final repo = ref.watch(profileRepositoryProvider(account?.id));
     final loaded = repo.load();
     if (loaded != null) return loaded;
-    // Fresh player: readable base name ("Guest", or the Google account's
+    // Fresh player: readable base name ("Guest", or the account's display
     // first name) + the stable #tag, persisted so the id (and thus the tag)
     // is stable across launches.
     final id = _newId();
@@ -34,7 +34,7 @@ class ProfileController extends Notifier<PlayerProfile> {
     return fresh;
   }
 
-  /// "Guest" for guests; the person's first name for Google accounts.
+  /// "Guest" for guests; the person's first name for signed-in accounts.
   static String _baseNameFor(AuthAccount? account) {
     if (account == null) return 'Guest';
     final first = account.displayName.trim().split(RegExp(r'\s+')).first;

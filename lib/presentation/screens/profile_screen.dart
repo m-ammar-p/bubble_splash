@@ -7,7 +7,7 @@ import '../../application/auth_controller.dart';
 import '../../application/profile_controller.dart';
 import '../../domain/models/achievement.dart';
 import '../../domain/models/player_profile.dart';
-import '../widgets/google_sign_in_button.dart';
+import '../widgets/auth_panel.dart';
 import '../widgets/player_avatar.dart';
 
 /// Maps an achievement's domain [Achievement.iconKey] to a Material icon.
@@ -192,12 +192,11 @@ class _AvatarBlock extends ConsumerWidget {
   /// of the name dialog, and land straight in it after signing in.
   Future<void> _editName(BuildContext context, WidgetRef ref) async {
     if (!ref.read(authControllerProvider).isSignedIn) {
-      final signedIn = await showGoogleSignInDialog(
+      final signedIn = await showSignInPrompt(
         context,
         title: 'Sign in to set your name',
         body: 'Guests play as ${ref.read(profileControllerProvider).name}. '
-            'Sign in with Google to pick your own name and keep your '
-            'progress on your account.',
+            'Create an account to pick your own name and keep your progress.',
       );
       if (!signedIn || !context.mounted) return;
     }
@@ -477,22 +476,24 @@ class _AchievementRow extends StatelessWidget {
   }
 }
 
-/// ACCOUNT card: signed-in shows the Google identity + Sign out; guest shows
-/// a "Sign in with Google" action (progression then follows that account —
-/// guest progress stays in the guest slot).
+/// ACCOUNT card: signed-in shows the account identity + Sign out; guest shows
+/// a "Sign in" action (progression then follows that account — guest progress
+/// stays in the guest slot).
 class _AccountCard extends ConsumerWidget {
   const _AccountCard();
 
   Future<void> _signIn(BuildContext context, WidgetRef ref) async {
-    final ok =
-        await ref.read(authControllerProvider.notifier).signInWithGoogle();
-    if (!context.mounted) return;
-    if (ok) {
-      final account = ref.read(authControllerProvider).account;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Signed in as ${account?.email}')),
-      );
-    }
+    final ok = await showSignInPrompt(
+      context,
+      title: 'Sign in',
+      body: 'Keep your levels, records and coins on your account — '
+          'across every device.',
+    );
+    if (!ok || !context.mounted) return;
+    final account = ref.read(authControllerProvider).account;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Signed in as ${account?.email}')),
+    );
   }
 
   Future<void> _signOut(BuildContext context, WidgetRef ref) async {
@@ -525,19 +526,17 @@ class _AccountCard extends ConsumerWidget {
       padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 11 * s),
       child: Row(
         children: [
-          // White circle + Google-blue G (drawn glyph-safe: Latin letter, not
-          // an emoji).
-          Container(
-            width: 34 * s,
-            height: 34 * s,
-            alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
+          // Gradient chip with a person glyph (drawn icon — no emoji tofu).
+          CandyChip(
+            colors: account == null ? Candy.mintChip : Candy.levelChip,
+            size: 34 * s,
+            child: Icon(
+              account == null
+                  ? Icons.person_outline_rounded
+                  : Icons.person_rounded,
+              size: 19 * s,
               color: Colors.white,
             ),
-            child: Text('G',
-                style: Candy.display(
-                    size: 18 * s, color: const Color(0xFF4285F4), height: 1)),
           ),
           SizedBox(width: 10 * s),
           Expanded(

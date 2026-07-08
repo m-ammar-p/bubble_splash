@@ -1,30 +1,37 @@
 import 'dart:convert';
 
-/// A signed-in identity. Today this comes from the fake Google service; later
-/// it maps 1:1 onto a real `google_sign_in` / Play Games account. Pure Dart.
+/// A signed-in identity. Comes from Supabase email/password auth; `id` is the
+/// Supabase user uuid. Pure Dart.
 class AuthAccount {
   const AuthAccount({
     required this.id,
     required this.displayName,
     required this.email,
+    this.country = '',
   });
 
-  /// Stable provider-side account id — used to namespace per-account storage
-  /// (see `PrefsProfileRepository`), so it must never change between sign-ins.
+  /// Stable provider-side account id (Supabase user uuid) — namespaces
+  /// per-account storage (`profile_<id>`), so it must never change.
   final String id;
   final String displayName;
   final String email;
+
+  /// ISO-3166 alpha-2 country code chosen at sign up (e.g. "PK", "US"),
+  /// used to bucket the local leaderboard. Empty when unknown.
+  final String country;
 
   Map<String, dynamic> toMap() => {
         'id': id,
         'displayName': displayName,
         'email': email,
+        'country': country,
       };
 
   factory AuthAccount.fromMap(Map<String, dynamic> map) => AuthAccount(
         id: map['id'] as String,
         displayName: map['displayName'] as String,
         email: map['email'] as String,
+        country: map['country'] as String? ?? '',
       );
 }
 
@@ -35,10 +42,10 @@ class AuthAccount {
 class AuthState {
   const AuthState({required this.decided, this.account});
 
-  /// True once the player has chosen guest or Google on the login screen.
+  /// True once the player has chosen guest or an account on the login screen.
   final bool decided;
 
-  /// The signed-in Google account, or null when playing as a guest.
+  /// The signed-in account, or null when playing as a guest.
   final AuthAccount? account;
 
   static const undecided = AuthState(decided: false);

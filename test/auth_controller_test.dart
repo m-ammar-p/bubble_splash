@@ -8,22 +8,44 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Headless stand-in for the interactive Google flow: returns [account]
-/// (null = the player cancelled).
+/// Headless stand-in for the email/password service: returns [next] on the
+/// next sign in/up, or throws [failure] when set.
 class _StubAuthService implements AuthService {
-  AuthAccount? account;
+  AuthAccount? next;
+  AuthFailure? failure;
+
+  Future<AuthAccount> _resolve() async {
+    if (failure != null) throw failure!;
+    return next!;
+  }
 
   @override
-  Future<AuthAccount?> signInWithGoogle() async => account;
+  Future<AuthAccount> signUp({
+    required String email,
+    required String password,
+    required String name,
+    required String country,
+  }) =>
+      _resolve();
+
+  @override
+  Future<AuthAccount> signIn({
+    required String email,
+    required String password,
+  }) =>
+      _resolve();
 
   @override
   Future<void> signOut() async {}
 }
 
 const _acc1 = AuthAccount(
-    id: 'g1', displayName: 'Bubble Player', email: 'bubble@gmail.com');
-const _acc2 =
-    AuthAccount(id: 'g2', displayName: 'Splash Master', email: 's@gmail.com');
+    id: 'g1',
+    displayName: 'Bubble Player',
+    email: 'bubble@gmail.com',
+    country: 'PK');
+const _acc2 = AuthAccount(
+    id: 'g2', displayName: 'Splash Master', email: 's@gmail.com', country: 'US');
 
 void main() {
   late SharedPreferences prefs;
@@ -49,6 +71,9 @@ void main() {
   AuthController auth() => container.read(authControllerProvider.notifier);
   AuthState state() => container.read(authControllerProvider);
 
+  Future<String?> signIn() =>
+      auth().signIn(email: 'bubble@gmail.com', password: 'secret1');
+
   test('fresh install is undecided (login screen shown)', () {
     expect(state().decided, isFalse);
     expect(state().isGuest, isFalse);
@@ -63,34 +88,46 @@ void main() {
     expect(relaunch.read(authControllerProvider).isGuest, isTrue);
   });
 
-  test('Google sign-in stores the account and persists it', () async {
-    service.account = _acc1;
-    expect(await auth().signInWithGoogle(), isTrue);
+  test('sign in stores the account and persists it', () async {
+    service.next = _acc1;
+    expect(await signIn(), isNull); // null = success
     expect(state().isSignedIn, isTrue);
     expect(state().account!.email, 'bubble@gmail.com');
+    expect(state().account!.country, 'PK');
 
     final relaunch = newContainer();
     expect(relaunch.read(authControllerProvider).account!.id, 'g1');
   });
 
-  test('cancelled sign-in changes nothing', () async {
-    service.account = null;
-    expect(await auth().signInWithGoogle(), isFalse);
+  test('sign up stores the account', () async {
+    service.next = _acc1;
+    final error = await auth().signUp(
+        email: 'bubble@gmail.com',
+        password: 'secret1',
+        name: 'Bubble Player',
+        country: 'PK');
+    expect(error, isNull);
+    expect(state().isSignedIn, isTrue);
+  });
+
+  test('failed sign-in returns the message and changes nothing', () async {
+    service.failure = const AuthFailure('Wrong email or password.');
+    expect(await signIn(), 'Wrong email or password.');
     expect(state().decided, isFalse);
   });
 
   test('sign out returns to undecided (login screen)', () async {
-    service.account = _acc1;
-    await auth().signInWithGoogle();
+    service.next = _acc1;
+    await signIn();
     await auth().signOut();
     expect(state().decided, isFalse);
     expect(state().account, isNull);
   });
 
   group('per-account profiles', () {
-    test('fresh signed-in profile is the Google first name + #tag', () async {
-      service.account = _acc1;
-      await auth().signInWithGoogle();
+    test('fresh signed-in profile is the account first name + #tag', () async {
+      service.next = _acc1;
+      await signIn();
       final profile = container.read(profileControllerProvider);
       expect(profile.name, matches(RegExp(r'^Bubble#\d{4}$')));
     });
@@ -109,8 +146,8 @@ void main() {
       profiles.rename('Ace');
       expect(container.read(profileControllerProvider).name, guestName);
 
-      service.account = _acc1;
-      await auth().signInWithGoogle();
+      service.next = _acc1;
+      await signIn();
       expect(profiles.canRename, isTrue);
       profiles.rename('Ace');
       expect(container.read(profileControllerProvider).name,
@@ -118,8 +155,8 @@ void main() {
     });
 
     test('progress follows the account across sign-out/sign-in', () async {
-      service.account = _acc1;
-      await auth().signInWithGoogle();
+      service.next = _acc1;
+      await signIn();
       container.read(profileControllerProvider.notifier).recordGameResult(
             const GameResult(
                 score: 500, bubblesPopped: 40, maxCombo: 5, goldenPopped: 2),
@@ -127,11 +164,11 @@ void main() {
       expect(container.read(profileControllerProvider).highScore, 500);
 
       await auth().signOut();
-      await auth().signInWithGoogle();
+      await signIn();
       expect(container.read(profileControllerProvider).highScore, 500);
     });
 
-    test('guest and Google accounts keep separate records', () async {
+    test('guest and account keep separate records', () async {
       // Guest plays first.
       auth().continueAsGuest();
       container.read(profileControllerProvider.notifier).recordGameResult(
@@ -141,13 +178,13 @@ void main() {
       expect(container.read(profileControllerProvider).highScore, 300);
 
       // Signing in switches to the account's own (fresh) profile.
-      service.account = _acc1;
-      await auth().signInWithGoogle();
+      service.next = _acc1;
+      await signIn();
       expect(container.read(profileControllerProvider).highScore, 0);
 
       // A second account gets its own slot too.
-      service.account = _acc2;
-      await auth().signInWithGoogle();
+      service.next = _acc2;
+      await auth().signIn(email: 's@gmail.com', password: 'secret2');
       expect(container.read(profileControllerProvider).name,
           startsWith('Splash#'));
 

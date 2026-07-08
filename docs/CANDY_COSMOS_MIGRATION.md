@@ -182,3 +182,20 @@ unchecked phase.
   chip 26→23 / label 14→12.5 — shrinks the back button + coins/level/lives pills on
   Home/Profile/Ranks/Shop headers. Gameplay HUD matched: close circle 38→34, lives pill
   chip 24→22, score Baloo 28→25, round hearts 21→19. Combo pill and sound toggle unchanged.
+- 2026-07-08: **real auth — Supabase email/password, Google dropped.** Google sign-in was
+  removed entirely (no Google Cloud dependency, works Android+iOS): `google_sign_in_button.dart`
+  (incl. `GoogleSignInButton`/`GoogleG`/`showGoogleSignInDialog`), `fake_google_auth_service.dart`,
+  and the `google_sign_in` dep were deleted. New `presentation/widgets/auth_panel.dart` — the
+  Candy `AuthPanel` (Sign in / Sign up toggle, name/email/password fields with a show-password
+  eye, a country selector on sign-up, inline validation + error line, orange CTA) and
+  `showSignInPrompt` (Candy sheet embedding `AuthPanel` for the Shop/Profile gates). `AuthPanel`
+  defaults to **Sign in**. Login screen rebuilt around it (glowing title hero + panel + "or" +
+  Play as Guest, keyboard-safe scroll). `AuthService` reshaped to `signUp`/`signIn` (return
+  `AuthAccount`, throw `AuthFailure`) + `signOut`, implemented by `SupabaseAuthService`
+  (email/password, name+country in user metadata) and `FakeAuthService` (in-memory, offline/
+  tests). `AuthController.signUp/signIn` return `String?` (error message or null). `AuthAccount`
+  gained `country`; sign-up collects an ISO country (prefilled from device locale) via
+  `lib/app/countries.dart` (`kCountries` + `showCountryPicker`) for the future local leaderboard.
+  Supabase wired in `lib/app/backend_config.dart` (URL + publishable key) + `Supabase.initialize`
+  in `main()`, both gated on `BackendConfig.isConfigured`. Requires Supabase "Confirm email" off
+  for straight-through signup.

@@ -4,10 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/fake/fake_leaderboard_repository.dart';
 import '../data/local/prefs_repositories.dart';
-import '../data/services/fake_google_auth_service.dart';
+import '../app/backend_config.dart';
+import '../data/services/fake_auth_service.dart';
 import '../data/services/fake_purchase_service.dart';
 import '../data/services/fake_rewarded_ad_service.dart';
 import '../data/services/noop_notification_scheduler.dart';
+import '../data/services/supabase_auth_service.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/free_life_repository.dart';
 import '../domain/repositories/leaderboard_repository.dart';
@@ -37,7 +39,7 @@ final navigatorKeyProvider =
 
 // ---- Repositories -------------------------------------------------------
 
-/// Keyed by the signed-in Google account id (null = guest, which keeps the
+/// Keyed by the signed-in account id (null = guest, which keeps the
 /// legacy bare `profile` slot). `ProfileController` picks the key from
 /// `authControllerProvider`, so each account carries its own progression.
 final profileRepositoryProvider =
@@ -77,5 +79,6 @@ final notificationSchedulerProvider =
     Provider<NotificationScheduler>((ref) => NoopNotificationScheduler());
 
 final authServiceProvider = Provider<AuthService>(
-  (ref) => FakeGoogleAuthService(ref.watch(navigatorKeyProvider)),
+  (ref) =>
+      BackendConfig.isConfigured ? SupabaseAuthService() : FakeAuthService(),
 );

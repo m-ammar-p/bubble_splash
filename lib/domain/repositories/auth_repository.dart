@@ -1,6 +1,6 @@
 import '../models/auth_state.dart';
 
-/// Persists the player's login choice (guest / Google account) across
+/// Persists the player's login choice (guest / account) across
 /// launches. Synchronous like the other meta-state repos — prefs is warmed in
 /// `main()`, so `Notifier.build()` can read it directly.
 abstract class AuthRepository {

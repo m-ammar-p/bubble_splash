@@ -9,7 +9,7 @@ import '../../app/candy.dart';
 import '../../domain/models/life_pack.dart';
 import '../../domain/models/lives_state.dart';
 import '../../domain/services/purchase_service.dart';
-import '../widgets/google_sign_in_button.dart';
+import '../widgets/auth_panel.dart';
 
 /// The Shop sells lives (the continue currency) for coins, and coins for real
 /// money (fake IAP for now). Bubble skins are no longer sold here — the skin
@@ -205,11 +205,11 @@ class ShopScreen extends ConsumerWidget {
     // on this device and vanish with it. Prompt at the moment of intent and,
     // on success, continue straight into the purchase they tapped.
     if (!ref.read(authControllerProvider).isSignedIn) {
-      final signedIn = await showGoogleSignInDialog(
+      final signedIn = await showSignInPrompt(
         context,
         title: 'Sign in to buy coins',
-        body: 'Purchases link to your Google account, so your coins and '
-            'progress are never lost.',
+        body: 'Purchases link to your account, so your coins and progress '
+            'are never lost.',
       );
       if (!signedIn || !context.mounted) return;
     }

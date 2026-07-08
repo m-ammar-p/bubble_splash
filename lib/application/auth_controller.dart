@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/models/auth_state.dart';
+import '../domain/services/auth_service.dart';
 import 'providers.dart';
 
-/// Owns the player's login choice (guest / Google) and persists it. The
-/// login screen is shown while [AuthState.decided] is false; every choice
-/// here lands in prefs so the app boots straight to Home afterwards.
+/// Owns the player's login choice (guest / account) and persists it. The login
+/// screen is shown while [AuthState.decided] is false; every choice here lands
+/// in prefs so the app boots straight to Home afterwards.
 ///
 /// Per-account progression hangs off this state: `profileControllerProvider`
 /// watches the signed-in account id and loads that account's profile (guests
@@ -23,13 +24,38 @@ class AuthController extends Notifier<AuthState> {
 
   void continueAsGuest() => _commit(const AuthState.guest());
 
-  /// Runs the provider sign-in flow. Returns true when an account was chosen;
-  /// false (player cancelled / flow failed) leaves the state untouched.
-  Future<bool> signInWithGoogle() async {
-    final account = await ref.read(authServiceProvider).signInWithGoogle();
-    if (account == null) return false;
-    _commit(AuthState.signedIn(account));
-    return true;
+  /// Creates an account and signs in. Returns null on success, or a
+  /// player-facing error message on failure (state untouched on failure).
+  Future<String?> signUp({
+    required String email,
+    required String password,
+    required String name,
+    required String country,
+  }) =>
+      _run(() => ref.read(authServiceProvider).signUp(
+            email: email,
+            password: password,
+            name: name,
+            country: country,
+          ));
+
+  /// Signs in an existing account. Returns null on success, else an error
+  /// message.
+  Future<String?> signIn({
+    required String email,
+    required String password,
+  }) =>
+      _run(() => ref
+          .read(authServiceProvider)
+          .signIn(email: email, password: password));
+
+  Future<String?> _run(Future<AuthAccount> Function() action) async {
+    try {
+      _commit(AuthState.signedIn(await action()));
+      return null;
+    } on AuthFailure catch (e) {
+      return e.message;
+    }
   }
 
   /// Signs out and returns to the undecided state (login screen).
