@@ -9,7 +9,9 @@ import '../data/services/fake_auth_service.dart';
 import '../data/services/fake_purchase_service.dart';
 import '../data/services/fake_rewarded_ad_service.dart';
 import '../data/services/noop_notification_scheduler.dart';
+import '../data/services/noop_remote_sync_service.dart';
 import '../data/services/supabase_auth_service.dart';
+import '../data/services/supabase_remote_sync_service.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/free_life_repository.dart';
 import '../domain/repositories/leaderboard_repository.dart';
@@ -18,6 +20,7 @@ import '../domain/repositories/profile_repository.dart';
 import '../domain/services/auth_service.dart';
 import '../domain/services/notification_scheduler.dart';
 import '../domain/services/purchase_service.dart';
+import '../domain/services/remote_sync_service.dart';
 import '../domain/services/rewarded_ad_service.dart';
 
 /// Infrastructure providers. This file is the single place concrete
@@ -81,4 +84,13 @@ final notificationSchedulerProvider =
 final authServiceProvider = Provider<AuthService>(
   (ref) =>
       BackendConfig.isConfigured ? SupabaseAuthService() : FakeAuthService(),
+);
+
+/// Mirrors the signed-in account's profile + rounds to Supabase (best-effort).
+/// No-op when Supabase isn't configured, so guests / offline / tests never
+/// touch the network.
+final remoteSyncServiceProvider = Provider<RemoteSyncService>(
+  (ref) => BackendConfig.isConfigured
+      ? SupabaseRemoteSyncService()
+      : NoopRemoteSyncService(),
 );

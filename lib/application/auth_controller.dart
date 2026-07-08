@@ -26,32 +26,47 @@ class AuthController extends Notifier<AuthState> {
 
   /// Creates an account and signs in. Returns null on success, or a
   /// player-facing error message on failure (state untouched on failure).
+  ///
+  /// The DB profile row is created at defaults by the `handle_new_user`
+  /// trigger; `ProfileController.build` mirrors its fresh (tagged-name) profile
+  /// up when it first loads for the new account.
   Future<String?> signUp({
     required String email,
     required String password,
     required String name,
     required String country,
-  }) =>
-      _run(() => ref.read(authServiceProvider).signUp(
+  }) async {
+    try {
+      final account = await ref.read(authServiceProvider).signUp(
             email: email,
             password: password,
             name: name,
             country: country,
-          ));
+          );
+      _commit(AuthState.signedIn(account));
+      return null;
+    } on AuthFailure catch (e) {
+      return e.message;
+    }
+  }
 
   /// Signs in an existing account. Returns null on success, else an error
-  /// message.
+  /// message. On success the account's remote profile is pulled into local
+  /// storage first, so `profileControllerProvider` rebuilds against it.
   Future<String?> signIn({
     required String email,
     required String password,
-  }) =>
-      _run(() => ref
-          .read(authServiceProvider)
-          .signIn(email: email, password: password));
-
-  Future<String?> _run(Future<AuthAccount> Function() action) async {
+  }) async {
     try {
-      _commit(AuthState.signedIn(await action()));
+      final account = await ref
+          .read(authServiceProvider)
+          .signIn(email: email, password: password);
+      final remote =
+          await ref.read(remoteSyncServiceProvider).fetchProfile(account.id);
+      if (remote != null) {
+        ref.read(profileRepositoryProvider(account.id)).save(remote);
+      }
+      _commit(AuthState.signedIn(account));
       return null;
     } on AuthFailure catch (e) {
       return e.message;

@@ -31,6 +31,11 @@ class ProfileController extends Notifier<PlayerProfile> {
     final fresh = PlayerProfile.initial(id: id)
         .copyWith(name: _taggedName(_baseNameFor(account), id));
     repo.save(fresh);
+    // First load for a signed-in account: mirror the fresh (tagged-name)
+    // profile up so the DB row reflects it instead of the trigger's defaults.
+    if (account != null) {
+      ref.read(remoteSyncServiceProvider).pushProfile(account.id, fresh);
+    }
     return fresh;
   }
 
@@ -53,6 +58,10 @@ class ProfileController extends Notifier<PlayerProfile> {
     state = next;
     final accountId = ref.read(authControllerProvider).account?.id;
     ref.read(profileRepositoryProvider(accountId)).save(next);
+    // Signed-in accounts mirror every change to Supabase (best-effort).
+    if (accountId != null) {
+      ref.read(remoteSyncServiceProvider).pushProfile(accountId, next);
+    }
   }
 
   static String _newId() =>
@@ -86,6 +95,12 @@ class ProfileController extends Notifier<PlayerProfile> {
       );
     }
     _commit(next);
+
+    // Append the round to the account's remote history (best-effort).
+    final accountId = ref.read(authControllerProvider).account?.id;
+    if (accountId != null) {
+      ref.read(remoteSyncServiceProvider).logRound(accountId, result);
+    }
 
     return RewardSummary(
       result: result,
