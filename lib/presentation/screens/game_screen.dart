@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/game_session_controller.dart';
 import '../../application/profile_controller.dart';
+import '../../application/rewarded_ad_manager.dart';
 import '../../app/candy.dart';
 import '../../domain/models/bubble_skin.dart';
 import '../../domain/models/game_result.dart';
@@ -22,21 +23,43 @@ class GameScreen extends ConsumerStatefulWidget {
   ConsumerState<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends ConsumerState<GameScreen> {
+class _GameScreenState extends ConsumerState<GameScreen>
+    with WidgetsBindingObserver {
   BubbleSplashGame? _game;
   RewardSummary? _summary;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Defer to after the first frame (avoid building the game during initState).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _startRound();
     });
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Flame auto-resumes the engine when the app is foregrounded. If the
+    // continue prompt / ad overlay is up, the loop must stay paused — re-pause
+    // it here so backgrounding mid-ad can never leave the game running behind
+    // the sheet or double-resume it.
+    if (state == AppLifecycleState.resumed) {
+      final game = _game;
+      if (game != null && game.isAwaitingDecision) game.pauseEngine();
+    }
+  }
+
   void _startRound() {
     final skin = skinById(ref.read(profileControllerProvider).equippedSkinId);
+    // Warm the first rewarded ad proactively at run start (never at death).
+    ref.read(rewardedAdManagerProvider.notifier).preload();
     setState(() {
       _summary = null;
       _game = BubbleSplashGame(
@@ -53,7 +76,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final game = _game;
     if (game == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) showContinueRoundSheet(context, game);
+      if (!mounted) return;
+      // Fresh death event: reset the per-death revive counter + warm an ad.
+      ref.read(rewardedAdManagerProvider.notifier).beginDeathEvent();
+      showContinueRoundSheet(context, game);
     });
   }
 

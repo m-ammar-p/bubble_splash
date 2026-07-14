@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../application/free_life_controller.dart';
 import '../../application/lives_controller.dart';
 import '../../application/profile_controller.dart';
-import '../../application/providers.dart';
+import '../../application/rewarded_ad_manager.dart';
 import '../../domain/models/lives_state.dart';
+import '../../domain/services/rewarded_ad_provider.dart';
 import '../../app/candy.dart';
 import '../../app/routes.dart';
 
@@ -20,11 +20,13 @@ class HomeScreen extends ConsumerWidget {
 
   void _play(BuildContext context) => Navigator.of(context).pushNamed(Routes.game);
 
-  Future<void> _claimFreeLife(BuildContext context, WidgetRef ref) async {
-    final earned = await ref.read(rewardedAdServiceProvider).showRewardedAd();
-    if (!earned) return;
-    final ok = ref.read(freeLifeControllerProvider.notifier).claim();
-    if (ok && context.mounted) {
+  /// Emits the "watch ad for a free life" intent to the manager, which owns the
+  /// cooldown + daily cap and is the ONLY place the life is granted (on a
+  /// completed view). This never grants.
+  Future<void> _watchHomeLife(BuildContext context, WidgetRef ref) async {
+    final result =
+        await ref.read(rewardedAdManagerProvider.notifier).watchForHomeLife();
+    if (result == RewardedAdShowResult.rewardEarned && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Free life claimed! +1 life')),
       );
@@ -33,13 +35,24 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(freeLifeControllerProvider);
     final lives = ref.watch(livesControllerProvider);
-    ref.watch(livesTickerProvider);
-    final freeLife = ref.read(freeLifeControllerProvider.notifier);
-    final canClaimFreeLife =
-        freeLife.canClaim && lives.count < LivesState.maxLives;
-    final freeLifeUntil = freeLife.untilClaimable();
+    ref.watch(livesTickerProvider); // per-second cooldown countdown
+    ref.watch(rewardedAdManagerProvider); // rebuild on load-phase / cap changes
+    final mgr = ref.read(rewardedAdManagerProvider.notifier);
+
+    // Warm an ad after the frame (idempotent) so the button can reach READY.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) mgr.preload();
+    });
+
+    final bankFull = lives.count >= LivesState.maxLives;
+    final phase = mgr.homeButtonPhase();
+    // Bank-full overrides — an ad that can't be banked would rob the player.
+    final freeLifeCanClaim = !bankFull && phase == RewardedAdButtonPhase.ready;
+    final freeLifeCooldown = phase == RewardedAdButtonPhase.cooldown
+        ? mgr.homeCooldownRemaining()
+        : null;
+    final freeLifeLabel = _homeAdLabel(bankFull, phase);
 
     final s = candyScale(context);
 
@@ -68,10 +81,10 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   const Spacer(),
                   _FreeLifeCard(
-                    canClaim: canClaimFreeLife,
-                    livesFull: lives.count >= LivesState.maxLives,
-                    until: freeLifeUntil,
-                    onClaim: () => _claimFreeLife(context, ref),
+                    canClaim: freeLifeCanClaim,
+                    label: freeLifeLabel,
+                    cooldown: freeLifeCooldown,
+                    onClaim: () => _watchHomeLife(context, ref),
                   ),
                   SizedBox(height: 14 * s),
                   _PlayButton(onPressed: () => _play(context)),
@@ -128,18 +141,38 @@ class _HeaderStats extends ConsumerWidget {
   }
 }
 
+/// Non-cooldown label for the home rewarded-ad card, from the manager's phase.
+String _homeAdLabel(bool bankFull, RewardedAdButtonPhase phase) {
+  if (bankFull) return 'Lives full (${LivesState.maxLives})';
+  switch (phase) {
+    case RewardedAdButtonPhase.ready:
+      return 'Watch ad for a free life';
+    case RewardedAdButtonPhase.loading:
+      return 'Loading ad…';
+    case RewardedAdButtonPhase.noFill:
+      return 'No ad available — retrying';
+    case RewardedAdButtonPhase.capReached:
+      return 'Daily ad limit reached';
+    case RewardedAdButtonPhase.cooldown: // handled via the timer branch
+    case RewardedAdButtonPhase.consumed:
+      return 'Watch ad for a free life';
+  }
+}
+
 /// Free-life card: glass row, heart chip + "Free life in MM:SS".
 class _FreeLifeCard extends StatelessWidget {
   const _FreeLifeCard({
     required this.canClaim,
-    required this.livesFull,
-    required this.until,
+    required this.label,
+    required this.cooldown,
     required this.onClaim,
   });
 
   final bool canClaim;
-  final bool livesFull;
-  final Duration until;
+  final String label;
+
+  /// Non-null → show a live "Free life in MM:SS" countdown instead of [label].
+  final Duration? cooldown;
   final VoidCallback onClaim;
 
   static String _fmt(Duration d) {
@@ -153,23 +186,21 @@ class _FreeLifeCard extends StatelessWidget {
     final s = candyScale(context);
 
     final Widget text;
-    if (livesFull) {
-      text = Text('Lives full (${LivesState.maxLives})',
-          style: Candy.ui(size: 15 * s, weight: FontWeight.w800));
-    } else if (canClaim) {
-      text = Text('Watch ad for a free life',
-          style: Candy.ui(size: 15 * s, weight: FontWeight.w800));
-    } else {
+    if (cooldown != null) {
       text = Text.rich(
         TextSpan(
           style: Candy.ui(size: 15 * s, weight: FontWeight.w800),
           children: [
             const TextSpan(text: 'Free life in '),
             TextSpan(
-                text: _fmt(until), style: const TextStyle(color: Candy.timer)),
+                text: _fmt(cooldown!),
+                style: const TextStyle(color: Candy.timer)),
           ],
         ),
       );
+    } else {
+      text = Text(label,
+          style: Candy.ui(size: 15 * s, weight: FontWeight.w800));
     }
 
     return CandyGlass(

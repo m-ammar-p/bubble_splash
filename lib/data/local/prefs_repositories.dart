@@ -1,13 +1,13 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/auth_state.dart';
-import '../../domain/models/free_life_state.dart';
 import '../../domain/models/lives_state.dart';
 import '../../domain/models/player_profile.dart';
+import '../../domain/models/rewarded_ad_meta.dart';
 import '../../domain/repositories/auth_repository.dart';
-import '../../domain/repositories/free_life_repository.dart';
 import '../../domain/repositories/lives_repository.dart';
 import '../../domain/repositories/profile_repository.dart';
+import '../../domain/repositories/rewarded_ad_repository.dart';
 
 /// Local, synchronous implementations of the meta-state repositories backed by
 /// [SharedPreferences] (already initialized at app bootstrap, so reads/writes
@@ -64,17 +64,17 @@ class PrefsLivesRepository implements LivesRepository {
   void save(LivesState state) => _prefs.setString(_key, state.toJson());
 }
 
-class PrefsFreeLifeRepository implements FreeLifeRepository {
-  PrefsFreeLifeRepository(this._prefs);
+class PrefsRewardedAdRepository implements RewardedAdRepository {
+  PrefsRewardedAdRepository(this._prefs);
   final SharedPreferences _prefs;
-  static const _key = 'free_life';
+  static const _key = 'rewarded_ad';
 
   @override
-  FreeLifeState? load() {
+  RewardedAdMeta? load() {
     final raw = _prefs.getString(_key);
-    return raw == null ? null : FreeLifeState.fromJson(raw);
+    return raw == null ? null : RewardedAdMeta.fromJson(raw);
   }
 
   @override
-  void save(FreeLifeState state) => _prefs.setString(_key, state.toJson());
+  void save(RewardedAdMeta meta) => _prefs.setString(_key, meta.toJson());
 }

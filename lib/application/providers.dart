@@ -7,21 +7,21 @@ import '../data/local/prefs_repositories.dart';
 import '../app/backend_config.dart';
 import '../data/services/fake_auth_service.dart';
 import '../data/services/fake_purchase_service.dart';
-import '../data/services/fake_rewarded_ad_service.dart';
+import '../data/services/fake_rewarded_ad_provider.dart';
 import '../data/services/noop_notification_scheduler.dart';
 import '../data/services/noop_remote_sync_service.dart';
 import '../data/services/supabase_auth_service.dart';
 import '../data/services/supabase_remote_sync_service.dart';
 import '../domain/repositories/auth_repository.dart';
-import '../domain/repositories/free_life_repository.dart';
 import '../domain/repositories/leaderboard_repository.dart';
 import '../domain/repositories/lives_repository.dart';
 import '../domain/repositories/profile_repository.dart';
+import '../domain/repositories/rewarded_ad_repository.dart';
 import '../domain/services/auth_service.dart';
 import '../domain/services/notification_scheduler.dart';
 import '../domain/services/purchase_service.dart';
 import '../domain/services/remote_sync_service.dart';
-import '../domain/services/rewarded_ad_service.dart';
+import '../domain/services/rewarded_ad_provider.dart';
 
 /// Infrastructure providers. This file is the single place concrete
 /// implementations are named — swapping the mock data/services for a real
@@ -61,8 +61,8 @@ final livesRepositoryProvider = Provider<LivesRepository>(
   (ref) => PrefsLivesRepository(ref.watch(sharedPreferencesProvider)),
 );
 
-final freeLifeRepositoryProvider = Provider<FreeLifeRepository>(
-  (ref) => PrefsFreeLifeRepository(ref.watch(sharedPreferencesProvider)),
+final rewardedAdRepositoryProvider = Provider<RewardedAdRepository>(
+  (ref) => PrefsRewardedAdRepository(ref.watch(sharedPreferencesProvider)),
 );
 
 final leaderboardRepositoryProvider =
@@ -70,8 +70,15 @@ final leaderboardRepositoryProvider =
 
 // ---- Services -----------------------------------------------------------
 
-final rewardedAdServiceProvider = Provider<RewardedAdService>(
-  (ref) => FakeRewardedAdService(ref.watch(navigatorKeyProvider)),
+/// ───────────────────────────────────────────────────────────────────────────
+/// THE SINGLE AD-SWAP LINE. To ship real ads, change ONLY this binding to
+/// `AdMobRewardedAdProvider()` (add its file under data/services/). The manager,
+/// game, UI, limits, and reward logic all depend on the [RewardedAdProvider]
+/// interface and require NO changes. See REWARDED_ADS.md → "TO DO WHEN ADDING
+/// ADMOB".
+/// ───────────────────────────────────────────────────────────────────────────
+final rewardedAdProviderProvider = Provider<RewardedAdProvider>(
+  (ref) => FakeRewardedAdProvider(ref.watch(navigatorKeyProvider)),
 );
 
 final purchaseServiceProvider = Provider<PurchaseService>(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/lives_controller.dart';
-import '../../application/providers.dart';
+import '../../application/rewarded_ad_manager.dart';
 import '../../app/candy.dart';
 import '../../domain/models/lives_state.dart';
 import '../../game/bubble_splash_game.dart';
@@ -40,10 +40,6 @@ class _ContinueRoundSheet extends ConsumerStatefulWidget {
 }
 
 class _ContinueRoundSheetState extends ConsumerState<_ContinueRoundSheet> {
-  static const int _maxAds = 3;
-  int _adsWatched = 0;
-  bool _busy = false;
-
   void _continue() {
     ref.read(livesControllerProvider.notifier).spendLife();
     widget.game.continueRound();
@@ -55,26 +51,48 @@ class _ContinueRoundSheetState extends ConsumerState<_ContinueRoundSheet> {
     Navigator.of(context).pop();
   }
 
+  /// Emits the "watch ad to revive" intent. The manager owns the limits and is
+  /// the ONLY place a life is granted (on a completed view) — this method never
+  /// grants. The button that calls it is enabled only when the manager reports
+  /// [RewardedAdButtonPhase.ready], so there's no local gating here.
   Future<void> _watchAd() async {
-    if (_busy || _adsWatched >= _maxAds) return;
-    setState(() => _busy = true);
-    final earned = await ref.read(rewardedAdServiceProvider).showRewardedAd();
-    if (!mounted) return;
-    if (earned) {
-      ref.read(livesControllerProvider.notifier).addLife();
-      _adsWatched++;
+    await ref.read(rewardedAdManagerProvider.notifier).watchForRevive();
+    // Reward (if earned) is already banked by the manager; the sheet just
+    // rebuilds off the new lives + manager state.
+  }
+
+  /// Label + enabled-state for the revive ad button, derived purely from the
+  /// manager's state machine (Step 6) — never a local bool. A full bank is a UI
+  /// concern (an ad that can't be banked would rob the player), so it overrides.
+  ({String label, bool enabled, bool hidden}) _adButton(bool bankFull) {
+    final mgr = ref.read(rewardedAdManagerProvider.notifier);
+    if (bankFull) {
+      return (label: 'Lives full (${LivesState.maxLives})', enabled: false, hidden: false);
     }
-    setState(() => _busy = false);
+    switch (mgr.reviveButtonPhase()) {
+      case RewardedAdButtonPhase.ready:
+        return (label: 'Watch ad · +1 life (${mgr.revivesLeft} left)', enabled: true, hidden: false);
+      case RewardedAdButtonPhase.loading:
+        return (label: 'Loading ad…', enabled: false, hidden: false);
+      case RewardedAdButtonPhase.noFill:
+        return (label: 'No ad available — retrying', enabled: false, hidden: false);
+      case RewardedAdButtonPhase.capReached:
+        return (label: 'Daily ad limit reached', enabled: false, hidden: false);
+      case RewardedAdButtonPhase.consumed:
+        return (label: '', enabled: false, hidden: true);
+      case RewardedAdButtonPhase.cooldown:
+        return (label: 'Please wait…', enabled: false, hidden: false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final lives = ref.watch(livesControllerProvider);
+    // Rebuild whenever the ad manager's state changes (load phase, revive count).
+    ref.watch(rewardedAdManagerProvider);
     final hasLife = lives.count > 0;
-    final adsLeft = _maxAds - _adsWatched;
-    // A full bank can't hold an ad life — offering an ad that grants nothing
-    // would rob the player, so the option is disabled at the cap.
     final bankFull = lives.isFull;
+    final ad = _adButton(bankFull);
     final s = candyScale(context);
 
     return CandySheet(
@@ -125,7 +143,7 @@ class _ContinueRoundSheetState extends ConsumerState<_ContinueRoundSheet> {
             ),
             SizedBox(height: 18 * s),
             CandyCtaButton(
-              onPressed: hasLife && !_busy ? _continue : null,
+              onPressed: hasLife ? _continue : null,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -156,18 +174,17 @@ class _ContinueRoundSheetState extends ConsumerState<_ContinueRoundSheet> {
               ),
             ),
             SizedBox(height: 10 * s),
-            _GlassButton(
-              onPressed: adsLeft > 0 && !bankFull && !_busy ? _watchAd : null,
-              icon: Icons.ondemand_video_rounded,
-              label: bankFull
-                  ? 'Lives full (${LivesState.maxLives})'
-                  : adsLeft > 0
-                      ? 'Watch ad · +1 life ($adsLeft left)'
-                      : 'Ad limit reached',
-            ),
-            SizedBox(height: 15 * s),
+            // Hidden once 3/3 revives are used (CONSUMED) — no dead button.
+            if (!ad.hidden) ...[
+              _GlassButton(
+                onPressed: ad.enabled ? _watchAd : null,
+                icon: Icons.ondemand_video_rounded,
+                label: ad.label,
+              ),
+              SizedBox(height: 15 * s),
+            ],
             GestureDetector(
-              onTap: _busy ? null : _end,
+              onTap: _end,
               child: Text(
                 'End run',
                 style: Candy.ui(

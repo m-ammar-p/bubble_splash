@@ -34,6 +34,11 @@ class BubbleSplashGame extends FlameGame {
   /// are ignored until the player decides.
   bool _awaitingDecision = false;
 
+  /// Exposed so the host screen can re-pause the engine if the app is
+  /// foregrounded mid-prompt (Flame auto-resumes on foreground; without this the
+  /// loop would run behind the continue sheet / ad overlay).
+  bool get isAwaitingDecision => _awaitingDecision;
+
   final Random _rng = Random();
 
   double _spawnTimer = 0;
