@@ -237,3 +237,42 @@ them. Local `RewardedAdMeta` stays the source of truth for **guests / offline**.
 signed-in user who goes **offline** falls back to local — reward is lives (no
 money), so this is an accepted trade, not a hole to plug. Full lock-down would
 need anonymous auth for all + AdMob SSV; deferred until real-money rewards.
+
+### Lessons learned (Piece 1 — read before touching the RPCs)
+
+Verified end-to-end on-device (signed-in account, real test ad → `claim_ad_view`
+→ `ad_daily_count` +1 in Supabase, cooldown stamped, +1 life). Bugs hit and what
+they teach:
+
+1. **`SECURITY INVOKER` functions run as the *caller* — every helper they call
+   must be executable by that role.** `0003` made `claim_ad_view` /
+   `ad_limit_state` `security invoker` (correct — RLS should apply as the user)
+   but then `revoke`d execute on their helper `_ad_normalize_window` from
+   `authenticated`. Result: every RPC failed with `42501 permission denied for
+   function _ad_normalize_window`. Fixed in `0004` by granting execute back — RLS
+   on `profiles` still confines each user to their own row, so it's safe. Rule:
+   don't revoke a helper from the role that reaches it through an invoker-security
+   parent; if you truly want the helper private, make it `SECURITY DEFINER`
+   instead (runs as owner, sidesteps the caller's grants) — but then *you* own the
+   row-scoping, so pass and check the uid explicitly.
+2. **Fail-soft hides server errors — it made the bug look like "nothing
+   happens".** The gate swallows every error and falls back to local
+   (`RewardedAdMeta`), so the `42501` surfaced as *the DB column silently staying
+   0 while the local count ticked up* — no crash, no log. When debugging a
+   fail-soft path, **call the underlying RPC directly with a real user JWT**
+   (`curl .../rpc/<fn>` + `Authorization: Bearer <access_token>` pulled from the
+   device's `sb-<ref>-auth-token` pref) — that surfaces the real error the app
+   ate. Consider a debug-only log on the soft-fail branch next time.
+3. **Unit tests passed but couldn't catch it — they use a fake gate + guest, so
+   the real RPC never runs.** A green `flutter test` proves the Dart wiring, not
+   the SQL. Server-authoritative work needs a **real-backend + real-auth**
+   verification pass (device or curl-with-JWT), not just headless tests.
+4. **Reward = `granted:true` only, ever.** The server (not the ad SDK) is the
+   final authority for signed-in users; a completed ad that the server declines
+   (cap/cooldown) grants nothing and reports `dismissedWithoutReward`. Never grant
+   optimistically before the RPC returns.
+5. **Reset is lazy + server-clock.** `ad_daily_count` rolls to 0 only when a
+   later RPC call (`ad_limit_state` on app load, or `claim_ad_view` on a watch)
+   sees `now() - ad_daily_window_start_ms >= 24h`. No cron. Rolling 24h from the
+   anchor, not local midnight. The device clock can't force it early — only the
+   `postgres`/service role can rewrite `ad_daily_window_start_ms`.
