@@ -6,8 +6,8 @@ import '../data/fake/fake_leaderboard_repository.dart';
 import '../data/local/prefs_repositories.dart';
 import '../app/backend_config.dart';
 import '../data/services/fake_auth_service.dart';
+import '../data/services/admob_rewarded_ad_provider.dart';
 import '../data/services/fake_purchase_service.dart';
-import '../data/services/fake_rewarded_ad_provider.dart';
 import '../data/services/noop_notification_scheduler.dart';
 import '../data/services/noop_remote_sync_service.dart';
 import '../data/services/supabase_auth_service.dart';
@@ -78,7 +78,7 @@ final leaderboardRepositoryProvider =
 /// ADMOB".
 /// ───────────────────────────────────────────────────────────────────────────
 final rewardedAdProviderProvider = Provider<RewardedAdProvider>(
-  (ref) => FakeRewardedAdProvider(ref.watch(navigatorKeyProvider)),
+  (ref) => AdMobRewardedAdProvider(),
 );
 
 final purchaseServiceProvider = Provider<PurchaseService>(

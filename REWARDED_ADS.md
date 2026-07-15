@@ -162,26 +162,44 @@ Fake overlay: full-screen, 5s countdown, an **X (skip)** → `dismissedWithoutRe
 (no reward), and a **Close & claim reward** button after the countdown →
 `rewardEarned`.
 
-## TO DO WHEN ADDING ADMOB
+## ADMOB — WIRED (real provider live)
 
-1. Add the dependency (`google_mobile_ads`) to `pubspec.yaml` and run a **full
-   restart** (not hot reload). Add app id + ad-unit ids to `AndroidManifest.xml`
-   / `Info.plist`. (These were intentionally left untouched in this phase.)
-2. Create `lib/data/services/admob_rewarded_ad_provider.dart` implementing
-   `RewardedAdProvider`:
-   - `load()` → `RewardedAd.load(...)`; map `onAdLoaded`→`ready`, `onAdFailedToLoad` no-fill code→`noFill`, else `failed`.
-   - `show()` → `ad.show(onUserEarnedReward: ...)`; resolve `rewardEarned` on the earn callback, `dismissedWithoutReward` on dismiss-without-earn, `failedToShow` on `onAdFailedToShowFullScreenContent`, `notReady` if none loaded. Set `fullScreenContentCallback` and null out the ad after show (single-use).
-3. **Change ONE line** in `lib/application/providers.dart`:
-   ```dart
-   final rewardedAdProviderProvider = Provider<RewardedAdProvider>(
-     (ref) => AdMobRewardedAdProvider(), // was FakeRewardedAdProvider(...)
-   );
-   ```
-4. Initialize the SDK in `main()` (`MobileAds.instance.initialize()`).
-5. Do **not** touch `RewardedAdManager`, `RewardedAdLimits`, the UI, or the
-   reward-granting logic. If you find yourself editing those, the abstraction
-   leaked — stop and fix the provider instead.
-6. Move the daily-cap / cooldown persistence to secure storage or a backend
-   before going live (see tamper-resistance above).
-7. Real AdMob shows its own activity, so it does not need the shared
-   `navigatorKey` the fake uses — drop that constructor arg in the real impl.
+Real AdMob is integrated. `google_mobile_ads` 9.0.0 is the provider;
+`rewardedAdProviderProvider` binds `AdMobRewardedAdProvider`. The fake
+(`FakeRewardedAdProvider`) is kept for reference/manual failure-mode testing but
+is no longer the default.
+
+What was done (files):
+- **Dep**: `google_mobile_ads: ^9.0.0` in `pubspec.yaml` (needs a full restart, not hot reload).
+- **IDs**: `lib/app/ad_config.dart` — the single source of truth for ad-unit ids.
+  `kDebugMode` serves Google's **test** unit; release serves the real unit.
+  Platform picked via `defaultTargetPlatform` (no `dart:io`, test-safe).
+- **App IDs** (the `~` ids): `AndroidManifest.xml`
+  (`com.google.android.gms.ads.APPLICATION_ID`) + `Info.plist`
+  (`GADApplicationIdentifier`). Kept in sync with `AdConfig`'s mirror constants.
+- **Provider**: `lib/data/services/admob_rewarded_ad_provider.dart` — `load()`
+  maps `onAdLoaded`→`ready`, `onAdFailedToLoad` code 3 (NO_FILL)→`noFill`, else
+  `failed`; `show()` grants `rewardEarned` only on `onUserEarnedReward`,
+  `dismissedWithoutReward` on dismiss-without-earn, `failedToShow` on the fail
+  callback; single-use (nulls the ad, disposes on dismiss/fail). No `navigatorKey`
+  (real AdMob owns its own activity).
+- **Swap line**: `providers.dart` → `AdMobRewardedAdProvider()`.
+- **SDK init**: `main()` fires `unawaited(MobileAds.instance.initialize())`.
+
+Untouched (the abstraction held): `RewardedAdManager`, `RewardedAdLimits`, the
+button state machine, the UI, and the reward-granting choke point — none needed
+edits. If a future change forces edits there to make ads work, the abstraction
+leaked; fix the provider instead.
+
+### STILL TO DO before monetized launch
+
+1. **iOS ids**: `AdConfig.iosAppId` / iOS rewarded unit are **test** placeholders
+   (no iOS AdMob app yet). Create the iOS app in AdMob, drop the real ids into
+   `AdConfig` + `Info.plist`'s `GADApplicationIdentifier`.
+2. **Real Android App ID** is live in the manifest; the real Android rewarded unit
+   is `AdConfig._androidRewardedReal` (used only in release builds).
+3. **Server-side verification / secure storage**: the daily-cap + cooldown
+   counters still live in spoofable `SharedPreferences` (see tamper-resistance
+   above). Move them server-side (and wire AdMob's SSV callback) before going live.
+4. **Test devices**: register your dev device as an AdMob test device (or keep
+   using the debug test unit) — never click live ads on your own account.

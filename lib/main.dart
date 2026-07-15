@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -20,6 +23,11 @@ Future<void> main() async {
       publishableKey: BackendConfig.supabasePublishableKey,
     );
   }
+
+  // Initialise the AdMob SDK so the first rewarded ad can preload without delay.
+  // Fire-and-forget: gameplay never blocks on the ad SDK, and the manager
+  // preloads proactively once this resolves.
+  unawaited(MobileAds.instance.initialize());
 
   final prefs = await SharedPreferences.getInstance();
 
