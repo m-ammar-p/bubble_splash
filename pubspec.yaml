@@ -49,6 +49,27 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# App icon generation (run: dart run flutter_launcher_icons).
+# Source art in assets/icon/ (copied from the design handoff — do NOT re-render).
+# web: omitted deliberately — web is not a target platform here (no web/ dir).
+# iOS icons are generated for the parked scaffold; iOS build verification needs macOS.
+# adaptive_icon_foreground_inset: 10 — the handoff foreground is near full-bleed (NOT in a 66%
+#   safe zone as its README claimed). Tool default 16% left a dark margin ring; 0% clipped the
+#   big orange bubble against the circle mask (orange rim). 10% keeps bubbles inside the circle
+#   with a thin star-field margin (reads as space). Tune here if a launcher mask crops differently.
+# adaptive_icon_background uses the designer's gradient PNG (matches the master), not flat #120830.
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  remove_alpha_ios: true
+  background_color_ios: "#120830"
+  adaptive_icon_background: "assets/icon/adaptive_background.png"
+  adaptive_icon_foreground: "assets/icon/adaptive_foreground.png"
+  adaptive_icon_foreground_inset: 10
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -53,6 +53,24 @@ See [CLAUDE.md](CLAUDE.md) for the full architecture notes, gotchas, and
 performance rules, and [docs/CANDY_COSMOS_MIGRATION.md](docs/CANDY_COSMOS_MIGRATION.md)
 for the UI-migration log.
 
+## App icon
+
+The launcher icon ("Candy Cosmos" bubbles) is generated with
+[`flutter_launcher_icons`](https://pub.dev/packages/flutter_launcher_icons) from
+source art in `assets/icon/` (do **not** re-render — copy/resize only). Config
+lives at the top level of `pubspec.yaml`; regenerate after changing the art:
+
+```bash
+dart run flutter_launcher_icons   # writes Android mipmaps/adaptive + iOS AppIcon
+```
+
+Android uses an **adaptive icon** (gradient star-field background + bubble
+foreground). `adaptive_icon_foreground_inset` controls how far the bubbles sit
+from the mask edge — the handoff foreground is near full-bleed, so the tool's
+default 16% left a dark margin ring and 0% clipped the orange bubble; 10% is the
+tuned value. Play Store listing icon (`icon-512.png` from the handoff) is
+uploaded manually at publish time, not bundled.
+
 ## Running
 
 ```bash
