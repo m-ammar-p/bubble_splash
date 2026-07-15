@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/models/rewarded_ad_meta.dart';
+import '../domain/services/rewarded_ad_gate.dart';
 import '../domain/services/rewarded_ad_limits.dart';
 import '../domain/services/rewarded_ad_provider.dart';
+import 'auth_controller.dart';
 import 'lives_controller.dart';
 import 'providers.dart';
 
@@ -58,10 +60,17 @@ class RewardedAdManager extends Notifier<RewardedAdManagerState> {
   bool _busy = false;
 
   RewardedAdProvider get _provider => ref.read(rewardedAdProviderProvider);
+  RewardedAdGate get _gate => ref.read(rewardedAdGateProvider);
   int _nowMs() => ref.read(clockProvider)().millisecondsSinceEpoch;
+
+  /// The signed-in account id, or null for a guest. Server enforcement (anti-
+  /// spoof) applies only to signed-in accounts; guests use the local cap path.
+  String? get _accountId => ref.read(authControllerProvider).account?.id;
 
   @override
   RewardedAdManagerState build() {
+    // Rebuild (and re-hydrate from the server) when the account changes.
+    final account = ref.watch(authControllerProvider).account;
     final repo = ref.read(rewardedAdRepositoryProvider);
     final loaded = (repo.load() ?? RewardedAdMeta.initial()).normalizedDaily(_nowMs());
     // Persist any window roll performed on load.
@@ -72,11 +81,30 @@ class RewardedAdManager extends Notifier<RewardedAdManagerState> {
       _backoffTimer?.cancel();
       provider.dispose();
     });
+    // Overwrite local counters with server truth for signed-in users (a local
+    // prefs edit can't survive this) — after build, so state exists.
+    if (account != null) {
+      Future.microtask(_hydrateFromServer);
+    }
     return RewardedAdManagerState(
       meta: loaded,
       loadPhase: RewardedAdLoadPhase.idle,
       revivesThisDeath: 0,
     );
+  }
+
+  /// Pulls the server-authoritative daily count + home cooldown and overwrites
+  /// the local meta. No-op (soft-fail) for guests / offline — local stands.
+  Future<void> _hydrateFromServer() async {
+    final id = _accountId;
+    if (id == null) return;
+    final s = await _gate.fetchState(id);
+    if (s == null) return;
+    _commitMeta(state.meta.copyWith(
+      dailyCount: s.dailyCount,
+      dailyWindowStartMs: s.dailyWindowStartMs,
+      homeLastWatchMs: s.homeLastClaimMs,
+    ));
   }
 
   void _commitMeta(RewardedAdMeta meta) {
@@ -156,9 +184,7 @@ class RewardedAdManager extends Notifier<RewardedAdManagerState> {
 
     final result = await _showGuarded();
     if (result == RewardedAdShowResult.rewardEarned) {
-      _grantReward();
-      _commitMeta(state.meta.recordView(_nowMs()));
-      state = state.copyWith(revivesThisDeath: state.revivesThisDeath + 1);
+      return _resolveEarnedView(RewardedAdKind.revive);
     }
     return result;
   }
@@ -185,15 +211,53 @@ class RewardedAdManager extends Notifier<RewardedAdManagerState> {
 
     final result = await _showGuarded();
     if (result == RewardedAdShowResult.rewardEarned) {
-      _grantReward();
-      // Cooldown anchor + daily view both stamped at the moment of completion.
-      final stamped = _nowMs();
-      _commitMeta(state.meta.withHomeWatch(stamped).recordView(stamped));
+      return _resolveEarnedView(RewardedAdKind.home);
     }
     return result;
   }
 
   // ---- Shared internals ---------------------------------------------------
+
+  /// Resolves a completed view into a reward decision. **Server-authoritative
+  /// for signed-in users**: the gate re-checks the daily cap (and, for `home`,
+  /// the 30-min cooldown) on the server clock and returns the verdict + updated
+  /// counters, which overwrite local meta. Guests / offline / a soft-failed gate
+  /// fall back to the local cap-stamp path (unchanged behaviour). Returns
+  /// `rewardEarned` iff a life was actually granted.
+  Future<RewardedAdShowResult> _resolveEarnedView(RewardedAdKind kind) async {
+    final id = _accountId;
+    if (id != null) {
+      final verdict = await _gate.claimView(id, kind);
+      if (verdict != null) {
+        _commitMeta(state.meta.copyWith(
+          dailyCount: verdict.dailyCount,
+          dailyWindowStartMs: verdict.dailyWindowStartMs,
+          homeLastWatchMs: verdict.homeLastClaimMs,
+        ));
+        if (!verdict.granted) {
+          // Ad played, but the server declined (cap/cooldown) — no life. Report
+          // as "no reward" so the UI doesn't falsely celebrate.
+          return RewardedAdShowResult.dismissedWithoutReward;
+        }
+        _grantReward();
+        if (kind == RewardedAdKind.revive) {
+          state = state.copyWith(revivesThisDeath: state.revivesThisDeath + 1);
+        }
+        return RewardedAdShowResult.rewardEarned;
+      }
+      // Gate soft-failed (offline / backend down) → fall through to local.
+    }
+    // Local path: guest, offline, or backend not configured.
+    _grantReward();
+    final now = _nowMs();
+    if (kind == RewardedAdKind.home) {
+      _commitMeta(state.meta.withHomeWatch(now).recordView(now));
+    } else {
+      _commitMeta(state.meta.recordView(now));
+      state = state.copyWith(revivesThisDeath: state.revivesThisDeath + 1);
+    }
+    return RewardedAdShowResult.rewardEarned;
+  }
 
   RewardedAdButtonPhase _loadDrivenPhase() {
     switch (state.loadPhase) {

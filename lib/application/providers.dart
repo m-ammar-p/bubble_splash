@@ -10,6 +10,8 @@ import '../data/services/admob_rewarded_ad_provider.dart';
 import '../data/services/fake_purchase_service.dart';
 import '../data/services/noop_notification_scheduler.dart';
 import '../data/services/noop_remote_sync_service.dart';
+import '../data/services/noop_rewarded_ad_gate.dart';
+import '../data/services/supabase_rewarded_ad_gate.dart';
 import '../data/services/supabase_auth_service.dart';
 import '../data/services/supabase_remote_sync_service.dart';
 import '../domain/repositories/auth_repository.dart';
@@ -21,6 +23,7 @@ import '../domain/services/auth_service.dart';
 import '../domain/services/notification_scheduler.dart';
 import '../domain/services/purchase_service.dart';
 import '../domain/services/remote_sync_service.dart';
+import '../domain/services/rewarded_ad_gate.dart';
 import '../domain/services/rewarded_ad_provider.dart';
 
 /// Infrastructure providers. This file is the single place concrete
@@ -100,4 +103,13 @@ final remoteSyncServiceProvider = Provider<RemoteSyncService>(
   (ref) => BackendConfig.isConfigured
       ? SupabaseRemoteSyncService()
       : NoopRemoteSyncService(),
+);
+
+/// Server-side rewarded-ad cap enforcer (anti-spoof, Piece 1). Real Supabase
+/// gate when configured, else a no-op that makes the manager fall back to the
+/// local `RewardedAdMeta` cap check. Only ever consulted for signed-in accounts.
+final rewardedAdGateProvider = Provider<RewardedAdGate>(
+  (ref) => BackendConfig.isConfigured
+      ? SupabaseRewardedAdGate()
+      : NoopRewardedAdGate(),
 );

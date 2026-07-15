@@ -1,12 +1,35 @@
 import 'package:bubble_splash/application/lives_controller.dart';
 import 'package:bubble_splash/application/providers.dart';
 import 'package:bubble_splash/application/rewarded_ad_manager.dart';
+import 'package:bubble_splash/domain/models/auth_state.dart';
 import 'package:bubble_splash/domain/models/rewarded_ad_meta.dart';
+import 'package:bubble_splash/domain/services/rewarded_ad_gate.dart';
 import 'package:bubble_splash/domain/services/rewarded_ad_limits.dart';
 import 'package:bubble_splash/domain/services/rewarded_ad_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Scriptable [RewardedAdGate] — stands in for the Supabase server enforcer.
+/// [claim] is the verdict returned by `claimView` (null = soft-fail/offline);
+/// [serverState] is what `fetchState` returns for the load-time hydration.
+class _FakeGate implements RewardedAdGate {
+  _FakeGate({this.claim, this.serverState});
+  AdLimitState? claim;
+  AdLimitState? serverState;
+  int claims = 0;
+  RewardedAdKind? lastKind;
+
+  @override
+  Future<AdLimitState?> fetchState(String accountId) async => serverState;
+
+  @override
+  Future<AdLimitState?> claimView(String accountId, RewardedAdKind kind) async {
+    claims++;
+    lastKind = kind;
+    return claim;
+  }
+}
 
 /// Headless scriptable ad provider — no UI. Queue [showResults]; each `show()`
 /// consumes the next (single-use, mirroring the real provider).
@@ -49,15 +72,25 @@ void main() {
     provider = _ScriptProvider();
   });
 
-  Future<ProviderContainer> make({RewardedAdMeta? seedMeta}) async {
-    SharedPreferences.setMockInitialValues(
-      seedMeta == null ? {} : {'rewarded_ad': seedMeta.toJson()},
-    );
+  Future<ProviderContainer> make({
+    RewardedAdMeta? seedMeta,
+    RewardedAdGate? gate,
+    bool signedIn = false,
+  }) async {
+    final initial = <String, Object>{};
+    if (seedMeta != null) initial['rewarded_ad'] = seedMeta.toJson();
+    if (signedIn) {
+      initial['auth'] = const AuthState.signedIn(
+        AuthAccount(id: 'acc-1', displayName: 'Tester', email: 't@e.com'),
+      ).toJson();
+    }
+    SharedPreferences.setMockInitialValues(initial);
     final prefs = await SharedPreferences.getInstance();
     final c = ProviderContainer(overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
       clockProvider.overrideWithValue(() => now),
       rewardedAdProviderProvider.overrideWithValue(provider),
+      if (gate != null) rewardedAdGateProvider.overrideWithValue(gate),
     ]);
     addTearDown(c.dispose);
     return c;
@@ -190,6 +223,73 @@ void main() {
       provider.loadResult = RewardedAdLoadResult.ready;
       await mgr().preload();
       expect(mgr().homeButtonPhase(), RewardedAdButtonPhase.ready);
+    });
+  });
+
+  group('server-side enforcement (signed-in, anti-spoof)', () {
+    AdLimitState verdict(bool granted, int count) => AdLimitState(
+          granted: granted,
+          dailyCount: count,
+          dailyWindowStartMs: now.millisecondsSinceEpoch,
+          homeLastClaimMs: 0,
+        );
+
+    test('server grant → life granted, revive counter advances', () async {
+      final gate = _FakeGate(claim: verdict(true, 1));
+      container = await make(gate: gate, signedIn: true);
+      provider.showResults.add(RewardedAdShowResult.rewardEarned);
+      await mgr().preload();
+      livesN().spendLife();
+      final before = lives();
+      final res = await mgr().watchForRevive();
+      expect(res, RewardedAdShowResult.rewardEarned);
+      expect(lives(), before + 1);
+      expect(gate.claims, 1);
+      expect(gate.lastKind, RewardedAdKind.revive);
+    });
+
+    test('server deny → ad watched but NO life granted', () async {
+      final gate = _FakeGate(claim: verdict(false, RewardedAdLimits.dailyViewCap));
+      container = await make(gate: gate, signedIn: true);
+      provider.showResults.add(RewardedAdShowResult.rewardEarned);
+      await mgr().preload();
+      livesN().spendLife();
+      final before = lives();
+      final res = await mgr().watchForRevive();
+      // Ad played, server declined → reported as no-reward, no life.
+      expect(res, RewardedAdShowResult.dismissedWithoutReward);
+      expect(lives(), before);
+    });
+
+    test('gate soft-fail (offline, null) → local fallback still grants',
+        () async {
+      final gate = _FakeGate(claim: null);
+      container = await make(gate: gate, signedIn: true);
+      provider.showResults.add(RewardedAdShowResult.rewardEarned);
+      await mgr().preload();
+      livesN().spendLife();
+      final before = lives();
+      final res = await mgr().watchForRevive();
+      expect(res, RewardedAdShowResult.rewardEarned);
+      expect(lives(), before + 1);
+    });
+
+    test('load-time hydration overwrites a spoofed local count with server truth',
+        () async {
+      // Local prefs claims a fresh window (spoofed reset), but the server says
+      // the daily cap is reached — hydration must win.
+      final gate = _FakeGate(
+        serverState: verdict(false, RewardedAdLimits.dailyViewCap),
+      );
+      container = await make(
+        gate: gate,
+        signedIn: true,
+        seedMeta: RewardedAdMeta.initial(),
+      );
+      await mgr().preload();
+      // Let the post-build hydration microtask apply the server state.
+      await Future<void>.delayed(Duration.zero);
+      expect(mgr().homeButtonPhase(), RewardedAdButtonPhase.capReached);
     });
   });
 

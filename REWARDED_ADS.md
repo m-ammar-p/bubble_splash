@@ -198,8 +198,42 @@ leaked; fix the provider instead.
    `AdConfig` + `Info.plist`'s `GADApplicationIdentifier`.
 2. **Real Android App ID** is live in the manifest; the real Android rewarded unit
    is `AdConfig._androidRewardedReal` (used only in release builds).
-3. **Server-side verification / secure storage**: the daily-cap + cooldown
-   counters still live in spoofable `SharedPreferences` (see tamper-resistance
-   above). Move them server-side (and wire AdMob's SSV callback) before going live.
+3. **AdMob SSV (deferred)**: server-side *verification* of the ad view itself
+   (Google's signed callback proving a genuine watch) is NOT wired. Add it if the
+   reward ever becomes real-money value; overkill for a lives-only reward. See
+   "Anti-spoof" below for what IS done.
 4. **Test devices**: register your dev device as an AdMob test device (or keep
    using the debug test unit) — never click live ads on your own account.
+
+## Anti-spoof: server-authoritative caps (Piece 1 — DONE, signed-in users)
+
+The daily cap + home cooldown are enforced **server-side for signed-in accounts**
+using the Supabase **server clock**, so editing local prefs can no longer reset
+them. Local `RewardedAdMeta` stays the source of truth for **guests / offline**.
+
+- **DB** (`supabase/migrations/0003_ad_limits.sql`): `profiles` gains
+  `ad_daily_count` + `ad_daily_window_start_ms` (home cooldown reuses the
+  existing `free_life_last_claim_ms`). Two SECURITY-INVOKER RPCs:
+  - `ad_limit_state()` — returns the authoritative counters for load-time
+    hydration (rolls the 24h window forward on the server clock).
+  - `claim_ad_view(p_kind)` — atomically re-checks the daily cap (and, for
+    `'home'`, the 30-min cooldown) and records one view; returns
+    `{ granted, daily_count, … }`. `p_kind` ∈ `home | revive`.
+- **Gate** (`RewardedAdGate` → `SupabaseRewardedAdGate` / `NoopRewardedAdGate`,
+  bound at `rewardedAdGateProvider`): every call **fails soft** (null → local
+  fallback), so offline play and guests are unaffected.
+- **Manager** (`RewardedAdManager`): on build it hydrates local counters from
+  the server for signed-in users (a prefs edit is overwritten); at the reward
+  choke point, a signed-in user's completed view is authorized by
+  `claim_ad_view` — the life is granted only on `granted: true`. A server deny
+  (cap/cooldown) reports `dismissedWithoutReward` (ad played, no life). Guests /
+  offline / a soft-failed gate keep the original local cap-stamp path.
+- **The per-death revive cap (3)** stays a runtime client value — it's never
+  persisted, so there's nothing to spoof.
+
+**Apply the migration** before this is live: `npx supabase db push`.
+
+**Known ceiling (accepted):** an anonymous **guest** is still local-only, and a
+signed-in user who goes **offline** falls back to local — reward is lives (no
+money), so this is an accepted trade, not a hole to plug. Full lock-down would
+need anonymous auth for all + AdMob SSV; deferred until real-money rewards.
