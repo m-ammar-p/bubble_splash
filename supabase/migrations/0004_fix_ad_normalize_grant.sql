@@ -1,0 +1,12 @@
+-- Fix for 0003: claim_ad_view() / ad_limit_state() are SECURITY INVOKER, so they
+-- execute the _ad_normalize_window() helper AS the calling (authenticated) user.
+-- 0003 revoked execute on that helper from `authenticated`, so every rewarded-ad
+-- RPC failed with SQLSTATE 42501 ("permission denied for function
+-- _ad_normalize_window") and the app silently fell back to the LOCAL cap path —
+-- nothing was written server-side (ad_daily_count stayed 0 while local counted).
+--
+-- Grant execute back. This is safe: the helper reads/writes only `where id =
+-- p_uid`, the parent RPCs always pass auth.uid(), and RLS on `profiles` confines
+-- every user to their own row regardless, so a direct call with someone else's
+-- uuid touches nothing.
+grant execute on function public._ad_normalize_window(uuid) to authenticated;
