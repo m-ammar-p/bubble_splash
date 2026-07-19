@@ -9,10 +9,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'app/backend_config.dart';
+import 'app/frame_stats.dart';
 import 'application/providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installFrameStats(); // profile-only frame telemetry (no-op in debug/release)
 
   // Lock to portrait — the game is designed for a vertical frame only; rotating
   // to landscape scrambles the fixed-scale Candy Cosmos layout.

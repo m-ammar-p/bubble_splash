@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/models/game_result.dart';
 import 'components/bubble.dart';
+import 'components/nebula_backdrop.dart';
 
 /// The Flame engine for a single round. Deliberately Riverpod-free: it owns only
 /// in-round state and reports the outcome via [onGameOver]. The meta layer
@@ -130,8 +131,15 @@ class BubbleSplashGame extends FlameGame {
   /// Current multiplier tier (0 = inactive, else 1–[maxComboTier]).
   final ValueNotifier<int> comboTier = ValueNotifier<int>(0);
 
-  /// Combo bar fill, 0..1. Drives the draining meter in the HUD.
+  /// Combo bar fill, 0..1. Drives the draining meter in the HUD. Published in
+  /// coarse [_fuelSteps] increments (the meter is ~128px wide, so steps stay
+  /// visually smooth) — a raw per-frame publish rebuilt the HUD pill 60×/s
+  /// for the whole combo window.
   final ValueNotifier<double> comboFuel = ValueNotifier<double>(0);
+
+  /// Frame-accurate fuel; [comboFuel] is its quantized public mirror.
+  double _comboFuelRaw = 0;
+  static const int _fuelSteps = 64;
 
   final ValueNotifier<int> score = ValueNotifier<int>(0);
   final ValueNotifier<int> hp = ValueNotifier<int>(maxHp);
@@ -155,8 +163,10 @@ class BubbleSplashGame extends FlameGame {
   /// Active score multiplier: 1× normally, else the combo tier ×2 (2/4/6).
   int get multiplier => comboTier.value > 0 ? comboTier.value * 2 : 1;
 
-  // Transparent so the screen's CandyNebulaBackground shows through behind
-  // the candy bubbles.
+  // The nebula stage is painted inside the canvas (see [NebulaBackdrop]), so
+  // one full-screen layer covers background + gameplay — a transparent canvas
+  // over a separate background widget cost a second full-screen blend every
+  // frame on fill-rate-bound low-end GPUs.
   @override
   Color backgroundColor() => const Color(0x00000000);
 
@@ -202,11 +212,15 @@ class BubbleSplashGame extends FlameGame {
       if (_comboTimer <= 0) combo.value = 0;
     }
 
-    // Combo bar drains while active; empty → multiplier back to 1×.
+    // Combo bar drains while active; empty → multiplier back to 1×. The raw
+    // value drains frame-accurately; the notifier only publishes 1/64 steps
+    // (ceil, so it reaches 0 exactly when the raw fuel does).
     if (comboTier.value > 0) {
-      comboFuel.value =
-          (comboFuel.value - dt / comboDurationSeconds).clamp(0.0, 1.0);
-      if (comboFuel.value <= 0) comboTier.value = 0;
+      _comboFuelRaw =
+          (_comboFuelRaw - dt / comboDurationSeconds).clamp(0.0, 1.0);
+      final quantized = (_comboFuelRaw * _fuelSteps).ceilToDouble() / _fuelSteps;
+      if (quantized != comboFuel.value) comboFuel.value = quantized;
+      if (_comboFuelRaw <= 0) comboTier.value = 0;
     }
   }
 
@@ -276,6 +290,7 @@ class BubbleSplashGame extends FlameGame {
       // combo bubble is its own gamble, not a fixed 2→4→6 ladder. Doesn't touch
       // the streak or count as a scoring pop — it's the reward itself.
       comboTier.value = 1 + _rng.nextInt(maxComboTier);
+      _comboFuelRaw = 1.0;
       comboFuel.value = 1.0;
       _play('pop.wav');
       return;
@@ -333,6 +348,7 @@ class BubbleSplashGame extends FlameGame {
     hp.value = maxHp;
     combo.value = 0;
     comboTier.value = 0;
+    _comboFuelRaw = 0;
     comboFuel.value = 0;
     _comboBubbleTimer = 0;
     _nextComboBubbleAt = _rollComboGap();
@@ -382,11 +398,43 @@ class BubbleSplashGame extends FlameGame {
 
   @override
   Future<void> onLoad() async {
+    add(NebulaBackdrop());
+    _warmSpriteCache();
     try {
       await FlameAudio.audioCache.loadAll(['pop.wav', 'game_over.wav']);
       _popPool = await FlameAudio.createPool('pop.wav', minPlayers: 1, maxPlayers: 5);
       _poolsLoaded = true;
     } catch (_) {/* no audio backend */}
+  }
+
+  /// Rasterize every reachable bubble sprite up front (~50 small images, one
+  /// pass at round start) so a first spawn of a new (kind, color, size) combo
+  /// never hitches mid-play on `toImageSync` + first-use GPU upload. No-ops
+  /// headlessly (buildSprite returns null without a rasterizer).
+  void _warmSpriteCache() {
+    // Spawn radii are 22–48 (normal/golden/bomb) → buckets 6..12; combo is 42.
+    const minBucket = 6, maxBucket = 12;
+    final variants = <(BubbleKind, Color)>[
+      for (final c in palette) (BubbleKind.normal, c),
+      (BubbleKind.golden, const Color(0xFFFFD700)),
+      (BubbleKind.bomb, const Color(0xFF37474F)),
+    ];
+    for (final (kind, color) in variants) {
+      for (var bucket = minBucket; bucket <= maxBucket; bucket++) {
+        final key = Bubble.spriteKey(kind, color, bucket);
+        if (spriteCache.containsKey(key)) continue;
+        final img = Bubble.buildSprite(kind, color, bucket * 4.0);
+        if (img == null) return; // headless — nothing to warm
+        spriteCache[key] = img;
+      }
+    }
+    const comboColor = Color(0xFFFF3D8B);
+    final comboBucket = Bubble.bucketFor(42);
+    final comboKey = Bubble.spriteKey(BubbleKind.combo, comboColor, comboBucket);
+    if (!spriteCache.containsKey(comboKey)) {
+      final img = Bubble.buildSprite(BubbleKind.combo, comboColor, comboBucket * 4.0);
+      if (img != null) spriteCache[comboKey] = img;
+    }
   }
 
   /// Rasterized bubble sprites shared across [Bubble]s, keyed on

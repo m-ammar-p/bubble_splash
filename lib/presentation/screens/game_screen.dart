@@ -98,13 +98,16 @@ class _GameScreenState extends ConsumerState<GameScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Candy Cosmos nebula stage behind the (transparent-bg) game canvas.
-          const Positioned.fill(child: CandyNebulaBackground()),
+          // The nebula stage is painted INSIDE the game canvas (NebulaBackdrop
+          // component) — one full-screen layer instead of two. Until the game
+          // is created the scaffold's Candy-colored background covers the gap.
           if (game != null) GameWidget<BubbleSplashGame>(game: game),
+          // Own layers: a score/combo repaint must not re-raster siblings
+          // (the game canvas repaints every frame regardless).
           if (game != null && _summary == null)
-            GameHud(game: game, onQuit: _goHome),
+            RepaintBoundary(child: GameHud(game: game, onQuit: _goHome)),
           if (game != null && _summary == null)
-            _HeadStartOverlay(headStart: game.headStart),
+            RepaintBoundary(child: _HeadStartOverlay(headStart: game.headStart)),
           if (_summary != null)
             ResultsOverlay(
               summary: _summary!,

@@ -90,14 +90,22 @@ class Bubble extends CircleComponent
   ui.Image? _sprite;
   double _pad = 0;
 
+  /// Radius bucket for the sprite cache (4px steps; blit scales the rest).
+  static int bucketFor(double radius) => max(1, (radius / 4).round());
+
+  /// Sprite-cache key for a (kind, color, radius bucket) combination — shared
+  /// by [onLoad] and the game's pre-warm pass.
+  static int spriteKey(BubbleKind kind, Color color, int bucket) =>
+      Object.hash(kind, color.toARGB32(), bucket);
+
   @override
   void onLoad() {
     _pad = radius * 0.4;
-    final bucket = max(1, (radius / 4).round());
-    final key = Object.hash(kind, paint.color.toARGB32(), bucket);
+    final bucket = bucketFor(radius);
+    final key = spriteKey(kind, paint.color, bucket);
     var sprite = game.spriteCache[key];
     if (sprite == null) {
-      sprite = _buildSprite(bucket * 4.0);
+      sprite = buildSprite(kind, paint.color, bucket * 4.0);
       if (sprite == null) return; // headless: keep cheap fallback in render()
       game.spriteCache[key] = sprite;
     }
@@ -107,8 +115,10 @@ class Bubble extends CircleComponent
   /// Paint the orb once at the bucketed radius [r] into a GPU-resident image.
   /// The glow halo bleeds past the circle, so the image is padded (same 0.4·r
   /// ratio as the blit rect, so scaling stays uniform). Returns null where no
-  /// rasterizer exists (headless tests).
-  ui.Image? _buildSprite(double r) {
+  /// rasterizer exists (headless tests). Static so the game can pre-warm the
+  /// whole cache at round start instead of hitching mid-play on each first
+  /// spawn of a new (kind, color, size) combination.
+  static ui.Image? buildSprite(BubbleKind kind, Color color, double r) {
     final pad = r * 0.4;
     final dim = (r * 2 + pad * 2).ceil();
     final recorder = ui.PictureRecorder();
@@ -121,7 +131,7 @@ class Bubble extends CircleComponent
         _paintCombo(canvas, center, r);
       case BubbleKind.normal:
       case BubbleKind.golden:
-        _paintCandy(canvas, center, r);
+        _paintCandy(canvas, center, r, color);
     }
     final picture = recorder.endRecording();
     try {
@@ -138,8 +148,7 @@ class Bubble extends CircleComponent
   /// outer accent glow + dark bottom-right / white top-left inner shading.
   /// Light/dark are derived from the palette color. Run once into the cache,
   /// at the bucketed radius [r].
-  void _paintCandy(Canvas canvas, Offset center, double r) {
-    final mid = paint.color;
+  static void _paintCandy(Canvas canvas, Offset center, double r, Color mid) {
     final hsl = HSLColor.fromColor(mid);
     final light =
         hsl.withLightness((hsl.lightness + 0.20).clamp(0.0, 1.0)).toColor();
@@ -198,7 +207,7 @@ class Bubble extends CircleComponent
   /// Bomb: translucent glass ball with a cartoon bomb (dark body, highlight,
   /// fuse, orange spark) drawn inside. Run once into the cache, at the
   /// bucketed radius [rad].
-  void _paintBomb(Canvas canvas, Offset center, double rad) {
+  static void _paintBomb(Canvas canvas, Offset center, double rad) {
     final bodyRect = Rect.fromCircle(center: center, radius: rad);
 
     // Glass ball: rgba(255,255,255,.35) → .10 30% → slate .10 60% → dark .20.
@@ -280,7 +289,7 @@ class Bubble extends CircleComponent
   /// with a white five-point star baked in the middle — reads instantly as a
   /// bonus/reward, clearly different from the palette bubbles. Static like the
   /// others (a gentle pulse is applied cheaply in [render], no per-frame blur).
-  void _paintCombo(Canvas canvas, Offset center, double rad) {
+  static void _paintCombo(Canvas canvas, Offset center, double rad) {
     const pink = Color(0xFFFF3D8B);
     const light = Color(0xFFFFC2DE);
     const violet = Color(0xFF8A5BFF);
@@ -320,7 +329,7 @@ class Bubble extends CircleComponent
   }
 
   /// A five-point star path centered at [c] with the given outer/inner radii.
-  Path _starPath(Offset c, double outer, double inner) {
+  static Path _starPath(Offset c, double outer, double inner) {
     final path = Path();
     const points = 5;
     for (var i = 0; i < points * 2; i++) {

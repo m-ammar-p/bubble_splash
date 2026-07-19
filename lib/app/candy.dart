@@ -256,11 +256,18 @@ class _CandyFloatBubbleState extends State<CandyFloatBubble>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
+    // Two boundaries, both load-bearing: the OUTER one keeps the per-frame
+    // translate from dirtying the route layer (without it every bob re-painted
+    // the whole screen — glow title, cards, pills — at 60fps); the INNER one
+    // caches the orb itself so the blurred glow isn't re-rasterized per frame,
+    // leaving only a cheap cached-layer re-composite inside the outer layer.
+    return RepaintBoundary(
+        child: AnimatedBuilder(
       animation: _y,
       builder: (context, child) =>
           Transform.translate(offset: Offset(0, _y.value), child: child),
-      child: Container(
+      child: RepaintBoundary(
+          child: Container(
         width: widget.size,
         height: widget.size,
         decoration: BoxDecoration(
@@ -287,8 +294,8 @@ class _CandyFloatBubbleState extends State<CandyFloatBubble>
                 offset: const Offset(-3, -3)),
           ],
         ),
-      ),
-    );
+      )),
+    ));
   }
 }
 
@@ -329,7 +336,11 @@ class CandyNebulaBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Stack(
+    // Static full-screen art: rasterize once into its own layer so animating
+    // siblings (game canvas, HUD, float bubbles) never force these three
+    // full-screen gradients to repaint.
+    return const RepaintBoundary(
+        child: Stack(
       children: [
         // linear-gradient(160deg, #2C1256, #170B38 55%, #100728)
         Positioned.fill(
@@ -371,7 +382,7 @@ class CandyNebulaBackground extends StatelessWidget {
           ),
         ),
       ],
-    );
+    ));
   }
 }
 
