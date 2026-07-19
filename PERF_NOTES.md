@@ -1,16 +1,14 @@
-# Game smoothness + touch pass (resumable progress)
+# Game smoothness + touch pass (DONE)
 
-Goal: small bubbles tappable on every device; remove gameplay lag. Each step = own commit so a token reset can resume from git log.
+Goal was: small bubbles tappable on every device; remove gameplay lag. All steps shipped; the rules live in CLAUDE.md's gotchas.
 
-Root causes found:
-- **Touch:** `Bubble` is a `CircleComponent`; hit test = exact visual radius. Min radius 22 (44px) is below the 44px tap-target floor and the finger covers it. No hit padding.
-- **Lag:** `Bubble.render()` ran 3× `MaskFilter.blur` + a `RadialGradient.createShader` allocation **every frame, per bubble** (15–45 gaussian blurs/frame). `PopEffect` added 18 per-particle blurs per pop. These dominated frame time.
+Root causes:
+- **Touch:** `Bubble` (a `CircleComponent`) hit-tested at exact visual radius; min radius 22 (44px) sat at the tap-target floor and the finger covered it.
+- **Lag:** `Bubble.render()` ran 3× `MaskFilter.blur` + a shader alloc **every frame per bubble** (15–45 gaussian blurs/frame); `PopEffect` added 18 per-particle blurs per pop — dominated frame time.
 
-## Steps
-- [x] 1. Bubble hit area — override `containsLocalPoint` with a min tap radius (~34px).
-- [x] 2. Cache bubble visual to a `ui.Image` once in `onLoad`; `render` blits it. No per-frame blur/shader alloc.
-- [x] 3. PopEffect — drop per-particle `MaskFilter.blur`, cut count 18→12.
-- [x] 4. HUD/background blur cost during play (BackdropFilter over animating bg) — reduce if still janky.
-- [x] 5. Verify: `flutter analyze`, `flutter test`, profile-mode `app_time_stats` ~16ms budget; update CLAUDE.md.
-
-Mark a step done by checking it + committing.
+Fixes (all done):
+1. `containsLocalPoint` override → ~34px min hit radius.
+2. Bubble visual rasterized once to `ui.Image` in `onLoad`, blitted in `render` (no per-frame blur/shader).
+3. `PopEffect` dropped per-particle blur, count 18→12.
+4. HUD/background `BackdropFilter` cost cut (plain translucent fills).
+5. Verified in profile mode — `app_time_stats` within ~16ms budget.

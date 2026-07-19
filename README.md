@@ -1,90 +1,40 @@
 # Bubble Splash
 
-An arcade bubble-popping game built with [Flutter](https://flutter.dev) and the
-[Flame](https://flame-engine.org) game engine, wrapped in a full meta-game:
-XP/level progression, achievements, two-metric leaderboards, a lives shop, and a
-lives-as-continues economy. UI is skinned to the **"Candy Cosmos"** design
-(cosmic-violet nebula stage, glossy candy bubbles, Baloo 2 / Nunito type) —
-spec in [docs/design/candy_cosmos_handoff.md](docs/design/candy_cosmos_handoff.md).
+Arcade bubble-popper built with [Flutter](https://flutter.dev) + the [Flame](https://flame-engine.org) engine, wrapped in a full meta-game: XP/level progression, achievements, two-metric leaderboards, a lives shop, and a lives-as-continues economy. UI is skinned to **"Candy Cosmos"** (cosmic-violet nebula, glossy candy bubbles, Baloo 2 / Nunito type) — spec in [docs/design/candy_cosmos_handoff.md](docs/design/candy_cosmos_handoff.md).
 
 ## Gameplay
+Bubbles rise — **tap to pop and score**. A rare combo bubble grants a random ×2/×4/×6 timed multiplier. Golden bubbles pay bonus; popping a bomb depletes the round. On depletion you **continue**: spend a banked life or watch a rewarded ad → 3s head-start + temporary 50%-speed breather, score kept. Difficulty ramps asymptotically and plateaus (speed cap, spawn floor, max 6 on screen). Rounds grant XP toward levels/achievements.
 
-Bubbles rise from the bottom — **tap to pop and score**. Consecutive pops build
-a combo multiplier. Golden bubbles pay bonus points; popping a bomb (or missing
-3 bubbles) depletes the round. When that happens you can **continue**: spend a
-banked life or watch a rewarded ad, get a 3-second head-start and a temporary
-50%-speed breather, keep your score. Difficulty ramps asymptotically and
-plateaus (speed cap, spawn floor, max 6 bubbles on screen) so long runs stay
-playable. Rounds grant XP toward levels and achievements.
-
-**Economy:** play is always free — lives are never needed to start. Lives are
-in-round continues, earned passively (1 per 30 min), via the Free Life ad
-claim, and bought in the Shop with coins — all banked up to a single cap of
-100. Coins are a purchasable currency (IAP) spent on life packs; every
-purchase goes through one confirmation dialog.
+**Economy:** play is always free — lives never gate starting. Lives are in-round continues, earned passively (1/30 min), via the Free Life ad claim, or bought in the Shop with coins — all banked to a single cap of 100. Coins are a purchasable IAP currency spent on life packs; every purchase goes through one confirm dialog.
 
 ## Tech stack
-
-- **Flutter** 3.44+ / Dart 3.12+
-- **Flame** 1.37 · **flutter_riverpod** 3 · **google_fonts** (Baloo 2 / Nunito)
-- Platforms: Android + iOS (iOS builds require macOS/Xcode)
+- **Flutter** 3.44+ / Dart 3.12+ · **Flame** 1.37 · **flutter_riverpod** 3 · **google_fonts** · **google_mobile_ads** · **Supabase** (email/password auth + best-effort profile mirror)
+- Platforms: **Android** (active shipping target). iOS parked (scaffold committed, builds need macOS/Xcode). Windows is not a target.
 
 ## Architecture
-
-Layered, strict dependency direction `presentation → application → domain ← data`,
-plus a Riverpod-free `game/`:
-
+Layered, strict `presentation → application → domain ← data`, plus a Riverpod-free `game/`:
 ```
 lib/
-├── main.dart               # warms SharedPreferences, injects it, runs the app
-├── app/                    # MaterialApp, routes, legacy theme, candy.dart (Candy Cosmos tokens/widgets)
-├── domain/                 # pure Dart: models, repo/service interfaces, level math, achievements
-├── data/                   # prefs-backed repos, fake leaderboard/ads/IAP (swap point for Firebase/AdMob/RevenueCat)
-├── application/            # Riverpod controllers: profile, lives, free life, session, leaderboard
-├── presentation/           # screens (home/game/profile/leaderboard/shop) + widgets (HUD, sheets, overlays)
-└── game/                   # Flame engine: BubbleSplashGame + bubble/pop/score components
+├── main.dart          # warms SharedPreferences, injects it, runs the app
+├── app/               # MaterialApp, routes, candy.dart (Candy Cosmos tokens/widgets), ad/backend config
+├── domain/            # pure Dart: models, repo/service interfaces, level math, achievements
+├── data/              # prefs repos, fake+live services (AdMob, Supabase, IAP) — swap point in providers.dart
+├── application/       # Riverpod controllers: profile, lives, ad manager, session, leaderboard
+├── presentation/      # screens (home/game/profile/leaderboard/shop) + widgets (HUD, sheets, overlays)
+└── game/              # Flame engine: BubbleSplashGame + bubble/pop/score components
 ```
+In-round state (`score`/`hp`/`combo`) is exposed as `ValueNotifier`s so the HUD rebuilds without touching the render loop; the game reports outcomes up via callbacks, stays Riverpod-free.
 
-In-round state (`score`, `hp`, `combo`) is exposed as `ValueNotifier`s so the
-HUD rebuilds reactively without touching the render loop; the game reports
-outcomes up via callbacks and stays Riverpod-free.
-
-See [CLAUDE.md](CLAUDE.md) for the full architecture notes, gotchas, and
-performance rules, and [docs/CANDY_COSMOS_MIGRATION.md](docs/CANDY_COSMOS_MIGRATION.md)
-for the UI-migration log.
+Full architecture, gotchas, and perf rules: [CLAUDE.md](CLAUDE.md). UI-migration log: [docs/CANDY_COSMOS_MIGRATION.md](docs/CANDY_COSMOS_MIGRATION.md). Ads spec: [REWARDED_ADS.md](REWARDED_ADS.md).
 
 ## App icon
-
-The launcher icon ("Candy Cosmos" bubbles) is generated with
-[`flutter_launcher_icons`](https://pub.dev/packages/flutter_launcher_icons) from
-source art in `assets/icon/` (do **not** re-render — copy/resize only). Config
-lives at the top level of `pubspec.yaml`; regenerate after changing the art:
-
-```bash
-dart run flutter_launcher_icons   # writes Android mipmaps/adaptive + iOS AppIcon
-```
-
-Android uses an **adaptive icon** (gradient star-field background + bubble
-foreground). `adaptive_icon_foreground_inset` controls how far the bubbles sit
-from the mask edge — the handoff foreground is near full-bleed, so the tool's
-default 16% left a dark margin ring and 0% clipped the orange bubble; 10% is the
-tuned value. Play Store listing icon (`icon-512.png` from the handoff) is
-uploaded manually at publish time, not bundled.
+Launcher icon generated with [`flutter_launcher_icons`](https://pub.dev/packages/flutter_launcher_icons) from `assets/icon/` (config in `pubspec.yaml`; regenerate with `dart run flutter_launcher_icons`). Android uses an adaptive icon — `adaptive_icon_foreground_inset` **10%** is tuned (default 16% left a dark margin ring, 0% clipped the orange bubble). Play Store 512 icon uploaded manually at publish.
 
 ## Running
-
 ```bash
 flutter pub get
 flutter run -d emulator-5554            # Android emulator
 flutter run --profile -d emulator-5554  # profile mode — the only valid way to judge fps
+flutter test && flutter analyze
+dart run tool/gen_audio.dart            # regenerate assets/audio/*.wav from pure math
 ```
-
-## Testing
-
-```bash
-flutter test
-flutter analyze
-```
-
-Audio is generated, not hand-committed: `dart run tool/gen_audio.dart`
-resynthesizes `assets/audio/*.wav` from pure math.

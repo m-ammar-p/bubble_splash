@@ -10,6 +10,8 @@ Bubble Splash is a Flutter game with a Flame-powered core and a full meta-game a
 
 **Key docs:** `docs/design/candy_cosmos_handoff.md` — the pixel-level UI spec (source of truth for any visual work on Home/Gameplay/Get Ready/Keep Going/Round Over); `docs/CANDY_COSMOS_MIGRATION.md` — the UI-migration log (what's done, what's pending, per-file change history); `REWARDED_ADS.md` — the full rewarded-ads spec (limits, button state machine, anti-spoof, lessons learned; `RewardedAdManager` is the owner); `PERF_NOTES.md` — the (completed) gameplay-perf/touch pass checklist whose fixes are summarized in the gotchas below.
 
+**Docs style — keep MD files concise (these get loaded into agent context; every line costs tokens):** when adding to any `.md`, write dense — preserve every concrete value (hex, px, limits, IDs, error strings, file paths) but cut prose fluff, restated background, and redundancy. Don't narrate history that git already records; collapse completed work into a short "done" summary instead of a step-by-step log. Terse fragments and tables over paragraphs. Add only what a future agent genuinely needs to understand or safely change the code.
+
 ## Commands
 
 ```bash
