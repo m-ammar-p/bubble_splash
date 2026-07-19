@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../app/ad_config.dart';
@@ -46,6 +47,14 @@ class AdMobRewardedAdProvider implements RewardedAdProvider {
         onAdFailedToLoad: (error) {
           _ad = null;
           _loading = false;
+          // Logged in every build mode (including release sideloads): the UI
+          // collapses every failure into one "No ad available" label, so
+          // without this the code (no-fill vs misconfigured unit vs network) is
+          // unrecoverable on real hardware. Load failures are rare — no spam.
+          debugPrint(
+            '[ads] load failed code=${error.code} domain=${error.domain} '
+            'msg=${error.message} unit=${AdConfig.rewardedUnitId}',
+          );
           // AdMob no-fill == code 3 (NO_FILL). Anything else is a transient
           // load error the manager retries with the same backoff.
           final result = error.code == 3
