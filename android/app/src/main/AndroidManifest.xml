@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Release builds need this explicitly: Flutter only injects INTERNET into
+         the debug/profile manifests, so without it a release APK has no network
+         at all (AdMob, Supabase and the google_fonts fetch all fail silently). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="bubble_splash"
         android:name="${applicationName}"

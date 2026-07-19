@@ -30,6 +30,15 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // R8 runs in release only. Without these keep rules it strips the
+            // reflectively-loaded WorkManager/Room classes that google_mobile_ads
+            // depends on, and the app dies at process start. See proguard-rules.pro.
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
