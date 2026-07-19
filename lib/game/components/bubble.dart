@@ -19,6 +19,10 @@ enum BubbleKind {
 
   /// Popping it ends the round; letting it escape is harmless.
   bomb,
+
+  /// Rare bonus power-up. Popping it bumps the score multiplier one tier
+  /// (2×→4×→6×) and refills the combo bar. Letting it escape is harmless.
+  combo,
 }
 
 /// A floating bubble rendered as a glossy "Candy Cosmos" sphere (spec screen
@@ -110,10 +114,14 @@ class Bubble extends CircleComponent
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     final center = Offset(r + pad, r + pad);
-    if (kind == BubbleKind.bomb) {
-      _paintBomb(canvas, center, r);
-    } else {
-      _paintCandy(canvas, center, r);
+    switch (kind) {
+      case BubbleKind.bomb:
+        _paintBomb(canvas, center, r);
+      case BubbleKind.combo:
+        _paintCombo(canvas, center, r);
+      case BubbleKind.normal:
+      case BubbleKind.golden:
+        _paintCandy(canvas, center, r);
     }
     final picture = recorder.endRecording();
     try {
@@ -268,15 +276,79 @@ class Bubble extends CircleComponent
         fuseEnd, rad * 0.09, Paint()..color = const Color(0xFFFFB13D));
   }
 
+  /// Combo power-up: a bright pink→violet glossy orb ringed by a strong glow,
+  /// with a white five-point star baked in the middle — reads instantly as a
+  /// bonus/reward, clearly different from the palette bubbles. Static like the
+  /// others (a gentle pulse is applied cheaply in [render], no per-frame blur).
+  void _paintCombo(Canvas canvas, Offset center, double rad) {
+    const pink = Color(0xFFFF3D8B);
+    const light = Color(0xFFFFC2DE);
+    const violet = Color(0xFF8A5BFF);
+    final bodyRect = Rect.fromCircle(center: center, radius: rad);
+
+    // Strong outer glow — the "big event" halo.
+    canvas.drawCircle(
+      center.translate(0, rad * 0.08),
+      rad,
+      Paint()
+        ..color = pink.withValues(alpha: 0.65)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, rad * 0.36),
+    );
+
+    // Glossy body: white specular → pink light → pink → violet rim.
+    canvas.drawCircle(
+      center,
+      rad,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.32, -0.48),
+          radius: 1.0,
+          colors: const [Colors.white, light, pink, violet],
+          stops: const [0.0, 0.20, 0.58, 1.0],
+        ).createShader(bodyRect),
+    );
+
+    // White star glyph, softly glowing.
+    final star = _starPath(center, rad * 0.62, rad * 0.26);
+    canvas.drawPath(
+      star,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.55)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, rad * 0.10),
+    );
+    canvas.drawPath(star, Paint()..color = Colors.white);
+  }
+
+  /// A five-point star path centered at [c] with the given outer/inner radii.
+  Path _starPath(Offset c, double outer, double inner) {
+    final path = Path();
+    const points = 5;
+    for (var i = 0; i < points * 2; i++) {
+      final r = i.isEven ? outer : inner;
+      final a = -pi / 2 + i * pi / points; // start pointing up
+      final p = Offset(c.dx + r * cos(a), c.dy + r * sin(a));
+      i == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
+    }
+    return path..close();
+  }
+
+  /// Combo bubbles gently breathe to catch the eye. Cheap: a per-frame scale of
+  /// the cached blit rect — no blur, no re-rasterization.
+  bool get _isCombo => kind == BubbleKind.combo;
+  double _pulseT = 0;
+
   @override
   void render(Canvas canvas) {
     final sprite = _sprite;
     if (sprite != null) {
-      final dim = radius * 2 + _pad * 2;
+      final base = radius * 2 + _pad * 2;
+      final pulse = _isCombo ? 1 + 0.06 * sin(_pulseT * 6.0) : 1.0;
+      final dim = base * pulse;
+      final o = radius - dim / 2; // keep the pulse centered on the orb
       canvas.drawImageRect(
         sprite,
         Rect.fromLTWH(0, 0, sprite.width.toDouble(), sprite.height.toDouble()),
-        Rect.fromLTWH(-_pad, -_pad, dim, dim),
+        Rect.fromLTWH(o, o, dim, dim),
         Paint()..filterQuality = FilterQuality.low,
       );
       return;
@@ -298,6 +370,7 @@ class Bubble extends CircleComponent
   void update(double dt) {
     super.update(dt);
     position.y -= speed * dt;
+    if (_isCombo) _pulseT += dt;
 
     if (!_resolved && position.y + radius < 0) {
       _resolved = true;
@@ -313,12 +386,13 @@ class Bubble extends CircleComponent
     event.handled = true;
     game.add(PopEffect(position.clone(), paint.color));
     game.onBubblePopped(kind);
-    // After scoring, surface the live multiplier as a floating "xN" label.
-    if (kind != BubbleKind.bomb && game.multiplier >= 2) {
+    // The multiplier is combo-bubble driven: only the combo bubble spawns a
+    // floating label, celebrating the new tier (2X!/4X!/6X!).
+    if (_isCombo) {
       game.add(ScorePopup(
         position: position.clone(),
-        label: '${game.multiplier}X',
-        color: const Color(0xFFFFD166),
+        label: '${game.multiplier}X!',
+        color: const Color(0xFFFFE14D),
       ));
     }
     removeFromParent();

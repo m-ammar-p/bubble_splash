@@ -98,12 +98,46 @@ class BubbleSplashGame extends FlameGame {
   /// Round HP: missing this many bubbles (or popping a bomb) ends the round.
   static const int maxHp = 3;
 
-  /// Consecutive pops within this window keep the combo alive.
+  /// Consecutive pops within this window keep the streak alive. The streak is a
+  /// *stat only* (feeds [GameResult.maxCombo]); it no longer drives scoring —
+  /// the score multiplier now comes solely from the combo power-up bubble.
   static const double comboWindow = 1.4;
   double _comboTimer = 0;
 
+  // ── Combo power-up (the score multiplier) ──────────────────────────────────
+  // The multiplier is NOT earned by chaining pops. A rare "combo bubble" spawns
+  // on a timed cadence; popping it sets a RANDOM tier (×2/×4/×6) and refills a
+  // fuel bar that then drains on a strict countdown — scoring pops do NOT extend
+  // it. When the bar empties, the multiplier resets to 1×.
+
+  /// Multiplier tiers: tier t → t*2 ×. Capped at 3 (×6).
+  static const int maxComboTier = 3;
+
+  /// Seconds the combo lasts. A strict countdown from the last combo-bubble
+  /// pop — scoring pops do NOT extend it (time-pressure window, competitive).
+  static const double comboDurationSeconds = 5.0;
+
+  /// Min/max seconds between combo-bubble spawns — rare, one at a time, a treat.
+  static const double comboBubbleMinGap = 25;
+  static const double comboBubbleMaxGap = 35;
+
+  double _comboBubbleTimer = 0;
+  late double _nextComboBubbleAt = _rollComboGap();
+  double _rollComboGap() =>
+      comboBubbleMinGap +
+      _rng.nextDouble() * (comboBubbleMaxGap - comboBubbleMinGap);
+
+  /// Current multiplier tier (0 = inactive, else 1–[maxComboTier]).
+  final ValueNotifier<int> comboTier = ValueNotifier<int>(0);
+
+  /// Combo bar fill, 0..1. Drives the draining meter in the HUD.
+  final ValueNotifier<double> comboFuel = ValueNotifier<double>(0);
+
   final ValueNotifier<int> score = ValueNotifier<int>(0);
   final ValueNotifier<int> hp = ValueNotifier<int>(maxHp);
+
+  /// Consecutive-pop streak — a round stat (max feeds [GameResult.maxCombo]),
+  /// surfaced live nowhere now that the multiplier is combo-bubble driven.
   final ValueNotifier<int> combo = ValueNotifier<int>(0);
   final ValueNotifier<bool> soundOn;
 
@@ -118,8 +152,8 @@ class BubbleSplashGame extends FlameGame {
   int _goldenPopped = 0;
   int _maxCombo = 0;
 
-  /// Score multiplier from the current combo (1x, 2x at 5, 3x at 10, …).
-  int get multiplier => 1 + combo.value ~/ 5;
+  /// Active score multiplier: 1× normally, else the combo tier ×2 (2/4/6).
+  int get multiplier => comboTier.value > 0 ? comboTier.value * 2 : 1;
 
   // Transparent so the screen's CandyNebulaBackground shows through behind
   // the candy bubbles.
@@ -150,11 +184,29 @@ class BubbleSplashGame extends FlameGame {
           _spawnBubble();
         }
       }
+
+      // Combo bubble: rare, timed, one at a time (doesn't count toward the
+      // density cap so the reward is never starved out by a crowded screen).
+      _comboBubbleTimer += dt;
+      if (_comboBubbleTimer >= _nextComboBubbleAt &&
+          !children.whereType<Bubble>().any((b) => b.kind == BubbleKind.combo)) {
+        _comboBubbleTimer = 0;
+        _nextComboBubbleAt = _rollComboGap();
+        _spawnComboBubble();
+      }
     }
 
+    // Streak (stat only) times out; multiplier is combo-bubble driven.
     if (combo.value > 0) {
       _comboTimer -= dt;
       if (_comboTimer <= 0) combo.value = 0;
+    }
+
+    // Combo bar drains while active; empty → multiplier back to 1×.
+    if (comboTier.value > 0) {
+      comboFuel.value =
+          (comboFuel.value - dt / comboDurationSeconds).clamp(0.0, 1.0);
+      if (comboFuel.value <= 0) comboTier.value = 0;
     }
   }
 
@@ -175,6 +227,7 @@ class BubbleSplashGame extends FlameGame {
     final color = switch (kind) {
       BubbleKind.golden => const Color(0xFFFFD700),
       BubbleKind.bomb => const Color(0xFF37474F),
+      BubbleKind.combo => const Color(0xFFFF6B8B), // unreached here
       BubbleKind.normal => palette[_rng.nextInt(palette.length)],
     };
 
@@ -185,6 +238,24 @@ class BubbleSplashGame extends FlameGame {
         position: Vector2(x, size.y + radius),
         speed: speed,
         color: color,
+      ),
+    );
+  }
+
+  /// Spawn the rare combo power-up: large (easy to see + tap) and slower than a
+  /// normal bubble (relief-scaled, no score ramp) so the player has time to
+  /// reach the treat before it escapes.
+  void _spawnComboBubble() {
+    const radius = 42.0;
+    final x = radius + _rng.nextDouble() * (size.x - 2 * radius);
+    final speed = (_baseSpeed + 20) * 0.7 * _speedRelief;
+    add(
+      Bubble(
+        kind: BubbleKind.combo,
+        radius: radius,
+        position: Vector2(x, size.y + radius),
+        speed: speed,
+        color: const Color(0xFFFF3D8B), // hot pink core; sprite adds the glow
       ),
     );
   }
@@ -200,6 +271,16 @@ class BubbleSplashGame extends FlameGame {
       return;
     }
 
+    if (kind == BubbleKind.combo) {
+      // Combo power-up: roll a RANDOM tier (×2/×4/×6) and refill the bar — each
+      // combo bubble is its own gamble, not a fixed 2→4→6 ladder. Doesn't touch
+      // the streak or count as a scoring pop — it's the reward itself.
+      comboTier.value = 1 + _rng.nextInt(maxComboTier);
+      comboFuel.value = 1.0;
+      _play('pop.wav');
+      return;
+    }
+
     combo.value++;
     _comboTimer = comboWindow;
     _maxCombo = max(_maxCombo, combo.value);
@@ -211,13 +292,21 @@ class BubbleSplashGame extends FlameGame {
       gained += 5; // golden bonus
     }
     score.value += gained;
+    // No top-up: the combo is a strict [comboDurationSeconds] countdown. Only
+    // popping another combo bubble refreshes it (and bumps the tier), so the
+    // multiplier is a real time-pressure window, not a self-sustaining state.
     _play('pop.wav');
   }
 
-  /// Called by a [Bubble] when it floats off the top unpopped. Bombs are safe
-  /// to let escape; only missed scoring bubbles cost HP.
+  /// Called by a [Bubble] when it floats off the top unpopped. Bombs and combo
+  /// power-ups are safe to let escape; only missed scoring bubbles cost HP.
   void onBubbleMissed(BubbleKind kind) {
-    if (isGameOver || _awaitingDecision || kind == BubbleKind.bomb) return;
+    if (isGameOver ||
+        _awaitingDecision ||
+        kind == BubbleKind.bomb ||
+        kind == BubbleKind.combo) {
+      return;
+    }
     combo.value = 0;
     hp.value--;
     if (hp.value <= 0) _offerContinue();
@@ -243,6 +332,10 @@ class BubbleSplashGame extends FlameGame {
     _awaitingDecision = false;
     hp.value = maxHp;
     combo.value = 0;
+    comboTier.value = 0;
+    comboFuel.value = 0;
+    _comboBubbleTimer = 0;
+    _nextComboBubbleAt = _rollComboGap();
     _speedRelief = reliefFactor;
     for (final bubble in children.whereType<Bubble>().toList()) {
       bubble.removeFromParent();
