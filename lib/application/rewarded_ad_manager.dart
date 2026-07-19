@@ -117,13 +117,28 @@ class RewardedAdManager extends Notifier<RewardedAdManagerState> {
   /// Proactively loads the next ad. Call at run start and on low health — never
   /// at the moment of death (a load delay must not stall the continue prompt).
   /// Idempotent; drives NO_FILL exponential backoff internally.
+  ///
+  /// **Only acts from [RewardedAdLoadPhase.idle].** `ready`/`loading` need
+  /// nothing, and `noFill` already has a backoff retry armed — re-entering
+  /// there would cancel the timer and fire a fresh request. Home rebuilds once
+  /// a second (lives ticker) and preloads post-frame, so without this guard a
+  /// no-fill turned into one AdMob request per second (backoff defeated) and the
+  /// button flipped "Loading ad…" ↔ "No ad available — retrying" forever.
   Future<void> preload() async {
-    if (state.loadPhase == RewardedAdLoadPhase.ready ||
-        state.loadPhase == RewardedAdLoadPhase.loading) {
-      return;
-    }
+    if (state.loadPhase != RewardedAdLoadPhase.idle) return;
+    await _requestLoad();
+  }
+
+  /// Issues the actual load. Bypasses the [preload] phase guard so the backoff
+  /// timer can retry from `noFill`.
+  Future<void> _requestLoad() async {
     _backoffTimer?.cancel();
-    state = state.copyWith(loadPhase: RewardedAdLoadPhase.loading);
+    // Retrying after a no-fill keeps showing NO_FILL rather than bouncing back
+    // to LOADING — the label must stay stable across the whole backoff cycle.
+    final retrying = state.loadPhase == RewardedAdLoadPhase.noFill;
+    if (!retrying) {
+      state = state.copyWith(loadPhase: RewardedAdLoadPhase.loading);
+    }
     final result = await _provider.load();
     switch (result) {
       case RewardedAdLoadResult.ready:
@@ -142,10 +157,7 @@ class RewardedAdManager extends Notifier<RewardedAdManagerState> {
     _backoffTimer?.cancel();
     _backoffTimer = Timer(delay, () {
       // Only retry if still not ready (a manual preload may have succeeded).
-      if (state.loadPhase == RewardedAdLoadPhase.noFill) {
-        state = state.copyWith(loadPhase: RewardedAdLoadPhase.idle);
-        preload();
-      }
+      if (state.loadPhase == RewardedAdLoadPhase.noFill) _requestLoad();
     });
   }
 

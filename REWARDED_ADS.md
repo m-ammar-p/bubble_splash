@@ -55,6 +55,8 @@ CONSUMED    → hidden                    (revive only, 3/3)
 
 ## Preload + pause
 Preloaded proactively (run start, continue prompt open via `beginDeathEvent`, home visible), never at death. On `noFill`/`failed` → NO_FILL + exponential backoff retry until ready; reload after every `show()`.
+
+**`preload()` acts ONLY from `idle`** — `ready`/`loading` need nothing and `noFill` already has a backoff timer armed. Callers preload from `build`, and Home rebuilds ~1/s (`livesTickerProvider` cooldown countdown), so a `noFill`-permissive `preload()` cancelled the timer and re-requested every second: backoff fully defeated, one live AdMob request/sec, and the button visibly flip-flopped "Loading ad…" ↔ "No ad available — retrying". The backoff timer retries via `_requestLoad()` (bypasses the guard) and **keeps the phase at `noFill` while retrying**, so the label stays stable across the whole cycle instead of bouncing through LOADING. Pinned by `rewarded_ad_manager_test.dart` → "repeat preload during NO_FILL does not re-request or flip the label". General rule: a state machine whose retry is timer-owned must reject re-entry from the retrying state, or any per-frame/per-second caller becomes the retry loop.
 Continue flow owns pause: HP depletes → `_offerContinue()` → `pauseEngine()`; ad nests in the paused window; **both** `continueRound()` and `finishRound()` call `resumeEngine()` exactly once. Backgrounding mid-ad: `game_screen.didChangeAppLifecycleState` re-pauses while `game.isAwaitingDecision`, so the loop can't run behind the sheet or double-resume. Flame components never call the provider — the game emits `onContinueOffer`, `game_screen` bridges to the manager (game stays Riverpod-free).
 
 ## Anti-spoof: server-authoritative caps (Piece 1 — DONE, signed-in users)
@@ -76,7 +78,7 @@ Verified end-to-end on-device (signed-in → `claim_ad_view` → `ad_daily_count
 
 ## Live AdMob wiring
 - Dep `google_mobile_ads: ^9.0.0` (needs full restart). SDK init: `main()` → `unawaited(MobileAds.instance.initialize())`.
-- IDs in `ad_config.dart`: `kDebugMode` → Google **test** unit, release → real unit; platform via `defaultTargetPlatform` (no `dart:io`, test-safe). App IDs (`~`) in `AndroidManifest.xml` (`com.google.android.gms.ads.APPLICATION_ID`) + `Info.plist` (`GADApplicationIdentifier`).
+- IDs in `ad_config.dart`: `AdConfig.usingTestAds` (`kDebugMode` **or** `--dart-define=USE_TEST_ADS=true`) → Google **test** unit, else real unit; platform via `defaultTargetPlatform` (no `dart:io`, test-safe). Sideload onto your own hardware with `flutter build apk --release --dart-define=USE_TEST_ADS=true` — a plain release APK serves LIVE ads and one self-click risks the account. Chosen over AdMob per-device test-ID registration (no hashed IDs to collect/maintain; emulators are auto-registered by the SDK anyway). App IDs (`~`) in `AndroidManifest.xml` (`com.google.android.gms.ads.APPLICATION_ID`) + `Info.plist` (`GADApplicationIdentifier`).
 - `AdMobRewardedAdProvider`: `load()` maps loaded→ready, code-3→`noFill`, else `failed`; `show()` grants `rewardEarned` only on `onUserEarnedReward`; single-use. Manager/limits/state-machine/choke point needed no edits — if a future ad change forces edits there, fix the provider instead.
 
 ### Before monetized launch

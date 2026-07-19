@@ -38,12 +38,14 @@ class _ScriptProvider implements RewardedAdProvider {
   final List<RewardedAdShowResult> showResults = [];
   bool _ready = false;
   int showCount = 0;
+  int loadCount = 0;
 
   @override
   bool get isReady => _ready;
 
   @override
   Future<RewardedAdLoadResult> load() async {
+    loadCount++;
     if (loadResult == RewardedAdLoadResult.ready) _ready = true;
     return loadResult;
   }
@@ -146,6 +148,26 @@ void main() {
       final res = await mgr().watchForRevive(); // nothing reloaded
       expect(res, RewardedAdShowResult.notReady);
       expect(lives(), before + 1); // only one grant
+    });
+  });
+
+  group('no-fill backoff', () {
+    test('repeat preload during NO_FILL does not re-request or flip the label',
+        () async {
+      container = await make();
+      provider.loadResult = RewardedAdLoadResult.noFill;
+      await mgr().preload();
+      expect(provider.loadCount, 1);
+      expect(mgr().homeButtonPhase(), RewardedAdButtonPhase.noFill);
+
+      // Home rebuilds ~1/s (lives ticker) and preloads post-frame. Each of these
+      // must be a no-op: no new AdMob request (backoff owns the retry) and the
+      // phase must stay NO_FILL, never bounce to LOADING.
+      for (var i = 0; i < 5; i++) {
+        await mgr().preload();
+        expect(mgr().homeButtonPhase(), RewardedAdButtonPhase.noFill);
+      }
+      expect(provider.loadCount, 1);
     });
   });
 

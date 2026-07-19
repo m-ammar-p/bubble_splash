@@ -8,11 +8,19 @@ import 'package:flutter/foundation.dart';
 /// here only as documentation — keep the three in sync.
 ///
 /// **Ad-unit IDs** (the `/` ids) are read at runtime by
-/// `AdMobRewardedAdProvider`. In [kDebugMode] we always serve Google's public
-/// **test** unit — clicking a live ad while developing can get the AdMob account
-/// flagged. Release builds serve the real unit. Platform is chosen with
+/// `AdMobRewardedAdProvider`. In [kDebugMode] — or any build passing
+/// `--dart-define=USE_TEST_ADS=true` — we serve Google's public **test** unit;
+/// clicking a live ad on your own device can get the AdMob account flagged.
+/// Plain release builds serve the real unit. Platform is chosen with
 /// [defaultTargetPlatform] (no `dart:io`, keeping the file plugin-free-ish and
 /// test-safe).
+///
+/// Sideloading a release APK to test on real hardware would otherwise hit LIVE
+/// ads (debug mode is off), so build those with:
+/// `flutter build apk --release --dart-define=USE_TEST_ADS=true`.
+/// The store build stays `flutter build apk --release` (flag absent → real ads).
+/// This replaces per-device AdMob test-device registration — no hashed device
+/// IDs to collect or keep in sync.
 class AdConfig {
   AdConfig._();
 
@@ -35,10 +43,19 @@ class AdConfig {
       'ca-app-pub-3940256099942544/1712485313';
   static const String _testIosAppId = 'ca-app-pub-3940256099942544~1458002511';
 
+  /// Opt-in override so a **release/profile** build can still serve test ads on
+  /// real hardware: `--dart-define=USE_TEST_ADS=true`. Compile-time constant, so
+  /// a store build (flag absent) tree-shakes straight to the real unit.
+  static const bool _forceTestAds =
+      bool.fromEnvironment('USE_TEST_ADS', defaultValue: false);
+
+  /// True when this build must serve Google's test unit instead of the real one.
+  static bool get usingTestAds => kDebugMode || _forceTestAds;
+
   /// The rewarded ad-unit id for the current platform + build mode.
   static String get rewardedUnitId {
     final isIos = defaultTargetPlatform == TargetPlatform.iOS;
-    if (kDebugMode) {
+    if (usingTestAds) {
       return isIos ? _testIosRewarded : _testAndroidRewarded;
     }
     return isIos ? _iosRewardedReal : _androidRewardedReal;
