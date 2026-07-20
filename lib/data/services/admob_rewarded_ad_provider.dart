@@ -23,6 +23,32 @@ class AdMobRewardedAdProvider implements RewardedAdProvider {
   RewardedAd? _ad;
   bool _loading = false;
 
+  /// A load must never wedge the provider: if AdMob invokes neither callback,
+  /// `_loading` would stay true forever and every later load would short-circuit
+  /// to `failed` — a permanently dead ad button with no way back.
+  static const Duration _loadTimeout = Duration(seconds: 30);
+
+  /// The SDK-initialisation future, shared by every load.
+  ///
+  /// `main()` kicks `MobileAds.initialize()` off unawaited so startup isn't
+  /// blocked, but **a `RewardedAd.load` issued before init completes fails**.
+  /// Release builds start fast enough that the first preload (Home's post-frame
+  /// callback) reliably lost that race, which is why ads worked under `flutter
+  /// run` (slower startup, init won) but not in a release APK — on either the
+  /// emulator or a physical device. Awaiting here removes the race entirely;
+  /// `initialize()` is idempotent, so this reuses main's in-flight call.
+  static Future<InitializationStatus>? _initFuture;
+
+  static Future<void> _ensureInitialized() async {
+    try {
+      _initFuture ??= MobileAds.instance.initialize();
+      await _initFuture;
+    } catch (e) {
+      _initFuture = null; // let the next load retry initialisation
+      debugPrint('[ads] SDK init failed: $e');
+    }
+  }
+
   @override
   bool get isReady => _ad != null;
 
@@ -32,6 +58,8 @@ class AdMobRewardedAdProvider implements RewardedAdProvider {
     if (_loading) return RewardedAdLoadResult.failed; // one in flight already
     _loading = true;
 
+    await _ensureInitialized();
+
     final completer = Completer<RewardedAdLoadResult>();
     RewardedAd.load(
       adUnitId: AdConfig.rewardedUnitId,
@@ -40,6 +68,7 @@ class AdMobRewardedAdProvider implements RewardedAdProvider {
         onAdLoaded: (ad) {
           _ad = ad;
           _loading = false;
+          debugPrint('[ads] loaded unit=${AdConfig.rewardedUnitId}');
           if (!completer.isCompleted) {
             completer.complete(RewardedAdLoadResult.ready);
           }
@@ -64,7 +93,17 @@ class AdMobRewardedAdProvider implements RewardedAdProvider {
         },
       ),
     );
-    return completer.future;
+    // A silent AdMob callback must not wedge the provider (see [_loadTimeout]);
+    // report `failed` so the manager's backoff owns the retry. A late
+    // `onAdLoaded` still fills `_ad`, so the next load returns `ready`.
+    return completer.future.timeout(
+      _loadTimeout,
+      onTimeout: () {
+        _loading = false;
+        debugPrint('[ads] load timed out after ${_loadTimeout.inSeconds}s');
+        return RewardedAdLoadResult.failed;
+      },
+    );
   }
 
   @override
