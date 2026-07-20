@@ -80,12 +80,32 @@ Verified end-to-end on-device (signed-in → `claim_ad_view` → `ad_daily_count
 - Dep `google_mobile_ads: ^9.0.0` (needs full restart). SDK init: `main()` → `unawaited(MobileAds.instance.initialize())`.
 - IDs in `ad_config.dart`: `AdConfig.usingTestAds` (`kDebugMode` **or** `--dart-define=USE_TEST_ADS=true`) → Google **test** unit, else real unit; platform via `defaultTargetPlatform` (no `dart:io`, test-safe). Sideload onto your own hardware with `flutter build apk --release --dart-define=USE_TEST_ADS=true` — a plain release APK serves LIVE ads and one self-click risks the account. Chosen over AdMob per-device test-ID registration (no hashed IDs to collect/maintain; emulators are auto-registered by the SDK anyway). App IDs (`~`) in `AndroidManifest.xml` (`com.google.android.gms.ads.APPLICATION_ID`) + `Info.plist` (`GADApplicationIdentifier`).
 - `AdMobRewardedAdProvider`: `load()` maps loaded→ready, code-3→`noFill`, else `failed`; `show()` grants `rewardEarned` only on `onUserEarnedReward`; single-use. Manager/limits/state-machine/choke point needed no edits — if a future ad change forces edits there, fix the provider instead.
+- **`load()` awaits `_ensureInitialized()` first.** `main()`'s `initialize()` is unawaited, and a load issued before init completes fails — release startup is fast enough that the first preload reliably lost that race, so ads worked under `flutter run` (debug) and never in a release APK, on any device. The shared static init future is idempotent (reuses main's in-flight call) and is nulled on error so a later load retries.
+- **`load()` is capped at `_loadTimeout` (30s).** If AdMob invokes neither callback, `_loading` would stay true forever and every later load short-circuits to `failed` — a permanently dead button. On timeout it reports `failed` (manager backoff retries); a late `onAdLoaded` still fills `_ad`, so the next load returns `ready`.
+- **Both outcomes are logged** (`[ads] loaded …` / `[ads] load failed code=… domain=… msg=…` / `[ads] load timed out`), in every build mode. The UI collapses every failure into one "No ad available — retrying" label, so without the log the cause is unrecoverable on real hardware. Codes: 3 = no-fill, 1 = unit not configured, 2 = network, 0 = internal.
+
+### Verifying an ad change (do this, don't guess)
+Release-only ad bugs reproduce locally in ~2 min — `flutter run` on the emulator is a **debug** build, so "works on emulator, broken on phone" usually means debug-vs-release, not hardware:
+```bash
+flutter build apk --release --dart-define=USE_TEST_ADS=true
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+adb logcat -c && adb shell am start -n com.bubblesplash.game/.MainActivity
+adb logcat -d | grep -a "\[ads\]"        # expect: [ads] loaded unit=…/5224354917
+```
+Confirm the `--dart-define` actually baked in — a build finishing in ~3s reused a cached AOT snapshot (a real recompile is ~30s+):
+```bash
+unzip -p build/app/outputs/flutter-apk/app-release.apk lib/arm64-v8a/libapp.so | grep -a -c '3940256099942544/5224354917'   # test unit → 1
+unzip -p build/app/outputs/flutter-apk/app-release.apk lib/arm64-v8a/libapp.so | grep -a -c '9874648020868564/1000617240'   # real unit → 0 (tree-shaken)
+"$ANDROID_HOME/build-tools/<ver>/aapt2" dump permissions build/app/outputs/flutter-apk/app-release.apk   # INTERNET + AD_ID present
+```
+Full flow verified this way on a release APK: Home READY → death sheet "Watch ad · +1 life (3 left)" → test ad → "Reward granted" → life banked → button reloads to READY (`[ads] loaded` again after the show). **Dismiss test ads with the X, never `OPEN`** — that's the advertiser click-through.
 
 ### Before monetized launch
 1. **iOS IDs** are test placeholders (no iOS AdMob app) — create it, drop real IDs into `AdConfig` + `Info.plist`. (iOS is parked — low priority.)
 2. Real Android App ID is live; real Android rewarded unit `AdConfig._androidRewardedReal` (release only).
 3. **AdMob SSV** (Google signed-callback proof of a genuine watch) NOT wired — add only if reward becomes real-money.
-4. Register your dev device as an AdMob test device — never click live ads on your own account.
+4. Test on your own hardware with `--dart-define=USE_TEST_ADS=true` — never click live ads on your own account. (Supersedes per-device AdMob test-device registration.)
+5. **Real units won't fill until AdMob is ready to serve you**: account needs payment info, and an unpublished app gets heavily limited serving. A brand-new unit also no-fills for ~24–48h. "No ad available" on the real unit is expected until then and is **not** a code bug — confirm with the test unit before debugging.
 
 ## Simulating failure modes (dev)
 Swap `rewardedAdProviderProvider` back to `FakeRewardedAdProvider`; drive `FakeRewardedAdConfig.debug`:
