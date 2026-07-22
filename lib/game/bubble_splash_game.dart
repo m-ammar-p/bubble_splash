@@ -63,6 +63,19 @@ class BubbleSplashGame extends FlameGame {
   static double rampSpeedBonus(int score) =>
       _speedRampMax * (1 - exp(-score / _speedRampK));
 
+  /// Endless time-based creep, stacked on top of [rampSpeedBonus] so a run that
+  /// outlasts the score plateau keeps getting faster instead of flat-lining
+  /// forever. +25 px/s per minute of active play, **uncapped** — this is the
+  /// deliberate wall that guarantees every run eventually ends (score-chase),
+  /// as opposed to the score ramp which plateaus for early-game fairness.
+  static const double _timeSpeedRatePerSec = 25.0 / 60.0;
+  static double timeSpeedBonus(double elapsedSeconds) =>
+      _timeSpeedRatePerSec * elapsedSeconds;
+
+  /// Seconds of active play so far (survives continues — a revive does NOT
+  /// reset the escalation). Drives [timeSpeedBonus]; ticks in [update].
+  double _elapsed = 0;
+
   /// Seconds between spawns at [score]; eases from 0.85 down to
   /// [_minSpawnInterval] (initial slope 0.01 s/point, as before).
   static double spawnIntervalFor(int score) =>
@@ -74,12 +87,12 @@ class BubbleSplashGame extends FlameGame {
   static const int _maxOnScreen = 6;
 
   /// Post-continue mercy: speed multiplier applied to spawned bubbles. Set to
-  /// [reliefFactor] (50% slower) by [continueRound] — the player just died at
-  /// full speed, so restarting there means an instant second death — then
-  /// recovers linearly back to 1.0 over [reliefRecoverySeconds] of play.
+  /// [reliefFactor] (10% slower) by [continueRound] — a light safety net on top
+  /// of the screen-clear + 3s head-start breather — then recovers linearly back
+  /// to 1.0 over [reliefRecoverySeconds] of play.
   double _speedRelief = 1.0;
-  static const double reliefFactor = 0.5;
-  static const double reliefRecoverySeconds = 45;
+  static const double reliefFactor = 0.9;
+  static const double reliefRecoverySeconds = 10;
 
   /// Current mercy multiplier (1.0 = full speed). Exposed for tests.
   @visibleForTesting
@@ -175,6 +188,8 @@ class BubbleSplashGame extends FlameGame {
     super.update(dt);
     if (isGameOver || _awaitingDecision) return;
 
+    _elapsed += dt; // drives the endless time-based speed creep
+
     if (_grace > 0) {
       _grace -= dt; // head-start: hold spawns briefly after a continue
       final secs = _grace > 0 ? _grace.ceil() : 0;
@@ -229,7 +244,8 @@ class BubbleSplashGame extends FlameGame {
     final x = radius + _rng.nextDouble() * (size.x - 2 * radius);
     final speed = (_baseSpeed +
             _rng.nextDouble() * _speedJitter +
-            rampSpeedBonus(score.value)) *
+            rampSpeedBonus(score.value) +
+            timeSpeedBonus(_elapsed)) *
         _speedRelief;
 
     final roll = _rng.nextDouble();
@@ -339,8 +355,8 @@ class BubbleSplashGame extends FlameGame {
 
   /// Player spent a life / watched an ad to revive: restore HP, clear the
   /// screen, and grant a brief head-start before bubbles return. Bubbles
-  /// resume at [reliefFactor] (50%) of the score-derived speed — the player
-  /// just died at full speed — then recover to full over
+  /// resume at [reliefFactor] (90%) of the score-derived speed — a light dip on
+  /// top of the clean-slate breather — then recover to full over
   /// [reliefRecoverySeconds]; score/progression are untouched.
   void continueRound() {
     if (isGameOver || !_awaitingDecision) return;

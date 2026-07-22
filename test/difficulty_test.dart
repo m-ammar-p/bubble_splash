@@ -31,6 +31,27 @@ void main() {
     });
   });
 
+  group('endless time creep', () {
+    test('is zero at the start of a run', () {
+      expect(BubbleSplashGame.timeSpeedBonus(0), 0);
+    });
+
+    test('adds +25 px/s per minute of play', () {
+      expect(BubbleSplashGame.timeSpeedBonus(60), closeTo(25, 1e-9));
+      expect(BubbleSplashGame.timeSpeedBonus(300), closeTo(125, 1e-9));
+    });
+
+    test('is uncapped — keeps climbing forever (the guaranteed wall)', () {
+      // Unlike the score ramp, there is no ceiling: a 10-min run is far past
+      // the score plateau's +240.
+      expect(BubbleSplashGame.timeSpeedBonus(600), closeTo(250, 1e-9));
+      expect(
+        BubbleSplashGame.timeSpeedBonus(3600),
+        greaterThan(BubbleSplashGame.rampSpeedBonus(1000000)),
+      );
+    });
+  });
+
   group('spawn interval', () {
     test('starts at 0.85s and matches the old slope early', () {
       expect(BubbleSplashGame.spawnIntervalFor(0), closeTo(0.85, 1e-9));
@@ -69,7 +90,7 @@ void main() {
       }
     }
 
-    test('continuing halves the speed (50% relief)', () {
+    test('continuing dips the speed to the relief factor (10% slower)', () {
       final game = newGame();
       expect(game.speedRelief, 1.0);
       depleteHp(game);
@@ -79,10 +100,11 @@ void main() {
 
     test('relief recovers linearly and clamps at full speed', () {
       const half = BubbleSplashGame.reliefRecoverySeconds / 2;
-      // Halfway through recovery → halfway back to 1.0.
+      // Halfway through recovery → halfway from the factor back to 1.0.
+      const midpoint = (BubbleSplashGame.reliefFactor + 1.0) / 2;
       expect(
         BubbleSplashGame.recoverRelief(BubbleSplashGame.reliefFactor, half),
-        closeTo(0.75, 0.001),
+        closeTo(midpoint, 0.001),
       );
       // Fully recovered, and clamped at 1.0 thereafter.
       expect(
