@@ -62,8 +62,8 @@ class GameHud extends StatelessWidget {
   }
 }
 
-/// 34×34 glass circle with a white × — pause/quit (matches the meta headers'
-/// [kCandyBackCircleSize]).
+/// 34×34 glass circle with a white ⏸ — pauses the round and opens the pause
+/// menu (matches the meta headers' [kCandyBackCircleSize]).
 class _CloseButton extends StatelessWidget {
   const _CloseButton({required this.onTap});
   final VoidCallback onTap;
@@ -82,7 +82,7 @@ class _CloseButton extends StatelessWidget {
           color: Candy.glass(),
           border: Border.all(color: Candy.glassBorder()),
         ),
-        child: Icon(Icons.close_rounded, color: Colors.white, size: 15 * s),
+        child: Icon(Icons.pause_rounded, color: Colors.white, size: 16 * s),
       ),
     );
   }

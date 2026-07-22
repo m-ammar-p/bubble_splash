@@ -11,6 +11,7 @@ import '../../domain/models/game_result.dart';
 import '../../game/bubble_splash_game.dart';
 import '../widgets/continue_round_sheet.dart';
 import '../widgets/game_hud.dart';
+import '../widgets/pause_round_sheet.dart';
 import '../widgets/results_overlay.dart';
 
 /// Hosts the Flame [BubbleSplashGame] and bridges its outcome into the meta
@@ -27,6 +28,11 @@ class _GameScreenState extends ConsumerState<GameScreen>
     with WidgetsBindingObserver {
   BubbleSplashGame? _game;
   RewardSummary? _summary;
+
+  /// True while the manual pause menu is open. Distinct from
+  /// [BubbleSplashGame.isAwaitingDecision] (the death/continue pause); both must
+  /// re-pause the loop when the app is foregrounded (Flame auto-resumes it).
+  bool _isPaused = false;
 
   @override
   void initState() {
@@ -52,7 +58,9 @@ class _GameScreenState extends ConsumerState<GameScreen>
     // the sheet or double-resume it.
     if (state == AppLifecycleState.resumed) {
       final game = _game;
-      if (game != null && game.isAwaitingDecision) game.pauseEngine();
+      if (game != null && (game.isAwaitingDecision || _isPaused)) {
+        game.pauseEngine();
+      }
     }
   }
 
@@ -92,6 +100,28 @@ class _GameScreenState extends ConsumerState<GameScreen>
 
   void _goHome() => Navigator.of(context).pop();
 
+  /// Pause button (HUD ⏸) tapped: pause the loop and open the pause menu.
+  /// Resuming un-pauses; quitting finalizes the round so the earned score/XP is
+  /// banked via the Results overlay (never discarded). Dismissing == resume.
+  Future<void> _openPauseMenu() async {
+    final game = _game;
+    if (game == null || _isPaused || game.isAwaitingDecision || _summary != null) {
+      return;
+    }
+    _isPaused = true;
+    game.pauseEngine();
+    final choice = await showPauseSheet(context);
+    if (!mounted) return;
+    _isPaused = false;
+    final g = _game;
+    if (g == null) return;
+    if (choice == PauseChoice.quit) {
+      g.finishRound(); // emits GameResult → Results overlay banks the score
+    } else {
+      g.resumeEngine();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final game = _game;
@@ -105,7 +135,7 @@ class _GameScreenState extends ConsumerState<GameScreen>
           // Own layers: a score/combo repaint must not re-raster siblings
           // (the game canvas repaints every frame regardless).
           if (game != null && _summary == null)
-            RepaintBoundary(child: GameHud(game: game, onQuit: _goHome)),
+            RepaintBoundary(child: GameHud(game: game, onQuit: _openPauseMenu)),
           if (game != null && _summary == null)
             RepaintBoundary(child: _HeadStartOverlay(headStart: game.headStart)),
           if (_summary != null)
