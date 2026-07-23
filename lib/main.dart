@@ -25,7 +25,7 @@ Future<void> main() async {
 
   // Bring up Supabase only once real credentials are pasted into
   // BackendConfig; until then the app runs on the fake auth service so guest
-  // play and the demo chooser keep working. The SDK restores any saved session
+  // play and on-demand sign-in keep working. The SDK restores any saved session
   // here, so a signed-in player boots straight back in.
   if (BackendConfig.isConfigured) {
     await Supabase.initialize(

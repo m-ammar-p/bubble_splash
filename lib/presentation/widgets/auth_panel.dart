@@ -5,12 +5,13 @@ import '../../app/candy.dart';
 import '../../app/countries.dart';
 import '../../application/auth_controller.dart';
 
-/// The email/password auth form, Candy Cosmos styled. One widget, two hosts:
-/// the Login screen embeds it inline; the "sign in to continue" gate
-/// ([showSignInPrompt]) embeds it in a dialog. It owns its own mode (Sign in /
-/// Sign up), fields, validation, busy + error state, and calls the
-/// [AuthController]. On success it fires [onAuthenticated] — the host decides
-/// where to go (Home, or pop the gate).
+/// The email/password auth form, Candy Cosmos styled. Embedded by the
+/// "sign in to continue" gate ([showSignInPrompt]) — the on-demand sign-in
+/// surface (Shop coin gate, Profile name lock, Profile ACCOUNT card); there is
+/// no standalone login screen. It owns its own mode (Sign in / Sign up),
+/// fields, validation, busy + error state, and calls the [AuthController]. On
+/// success it fires [onAuthenticated] — the host decides what to do (pop the
+/// gate, continue the purchase, open the name editor).
 class AuthPanel extends ConsumerStatefulWidget {
   const AuthPanel({
     super.key,
