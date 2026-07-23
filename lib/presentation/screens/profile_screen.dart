@@ -17,7 +17,7 @@ const Map<String, IconData> _achievementIcons = {
   'bubble': Icons.bubble_chart,
   'level': Icons.military_tech,
   'calendar': Icons.calendar_month,
-  'palette': Icons.palette,
+  'crown': Icons.workspace_premium,
 };
 
 /// The avatar color swatches (spec screen 07). Each stores the mid color on

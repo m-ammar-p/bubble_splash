@@ -57,11 +57,11 @@ const List<Achievement> kAchievements = [
     isUnlocked: _games25,
   ),
   Achievement(
-    id: 'collector',
-    title: 'Collector',
-    description: 'Own 3 bubble skins',
-    iconKey: 'palette',
-    isUnlocked: _collector,
+    id: 'score_5000',
+    title: 'Legend',
+    description: 'Reach a high score of 5,000',
+    iconKey: 'crown',
+    isUnlocked: _score5000,
   ),
 ];
 
@@ -70,4 +70,4 @@ bool _score1000(PlayerProfile p) => p.highScore >= 1000;
 bool _pop1000(PlayerProfile p) => p.totalBubblesPopped >= 1000;
 bool _level5(PlayerProfile p) => p.level >= 5;
 bool _games25(PlayerProfile p) => p.gamesPlayed >= 25;
-bool _collector(PlayerProfile p) => p.ownedSkinIds.length >= 3;
+bool _score5000(PlayerProfile p) => p.highScore >= 5000;
