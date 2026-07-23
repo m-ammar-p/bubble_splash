@@ -193,6 +193,13 @@ class _LeaderboardRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = candyScale(context);
     final me = entry.isCurrentPlayer;
+    // Split the stable "#tag" off so the base name can ellipsize while the tag
+    // (the unique disambiguator) always stays visible — a single ellipsized
+    // Text would clip the tag off the end on long names.
+    final hash = entry.name.indexOf('#');
+    final baseName = hash >= 0 ? entry.name.substring(0, hash) : entry.name;
+    final tag = hash >= 0 ? entry.name.substring(hash) : '';
+    final nameColor = me ? Candy.titleText : Colors.white;
     return Container(
       margin: EdgeInsets.only(bottom: 8 * s),
       padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 9 * s),
@@ -240,13 +247,37 @@ class _LeaderboardRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  me ? '${entry.name} (You)' : entry.name,
-                  style: Candy.ui(
-                      size: 13.5 * s,
-                      weight: FontWeight.w800,
-                      color: me ? Candy.titleText : Colors.white),
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        baseName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Candy.ui(
+                            size: 13.5 * s,
+                            weight: FontWeight.w800,
+                            color: nameColor),
+                      ),
+                    ),
+                    // Unique tag — always visible, dimmed (never ellipsized).
+                    if (tag.isNotEmpty)
+                      Text(
+                        tag,
+                        style: Candy.ui(
+                            size: 13.5 * s,
+                            weight: FontWeight.w800,
+                            color: nameColor.withValues(alpha: 0.5)),
+                      ),
+                    if (me)
+                      Text(
+                        ' (You)',
+                        style: Candy.ui(
+                            size: 13.5 * s,
+                            weight: FontWeight.w800,
+                            color: nameColor.withValues(alpha: 0.5)),
+                      ),
+                  ],
                 ),
                 SizedBox(height: 1 * s),
                 Text(

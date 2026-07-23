@@ -486,7 +486,7 @@ class _AccountCard extends ConsumerWidget {
     final ok = await showSignInPrompt(
       context,
       title: 'Sign in',
-      body: 'Keep your levels, records and coins on your account — '
+      body: 'Keep your levels, records and coins on your account, '
           'across every device.',
     );
     if (!ok || !context.mounted) return;
@@ -510,7 +510,7 @@ class _AccountCard extends ConsumerWidget {
     await ref.read(authControllerProvider.notifier).signOut();
     if (!context.mounted) return;
     Navigator.of(context)
-        .pushNamedAndRemoveUntil(Routes.login, (route) => false);
+        .pushNamedAndRemoveUntil(Routes.home, (route) => false);
   }
 
   @override
@@ -518,6 +518,12 @@ class _AccountCard extends ConsumerWidget {
     final s = candyScale(context);
     final auth = ref.watch(authControllerProvider);
     final account = auth.account;
+    // Signed-in players see their live (editable) profile name, so a rename
+    // shows here too — the account's frozen sign-up displayName isn't used.
+    // Drop the "#tag" here (the email below is the unique identifier); the
+    // full tagged handle still shows in the profile header.
+    final fullName = ref.watch(profileControllerProvider).name;
+    final profileName = fullName.split('#').first;
 
     return CandyGlass(
       radius: 16 * s,
@@ -544,7 +550,7 @@ class _AccountCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  account?.displayName ?? 'Guest player',
+                  account == null ? 'Guest player' : profileName,
                   style: Candy.ui(size: 14 * s, weight: FontWeight.w800),
                 ),
                 SizedBox(height: 1 * s),
@@ -780,11 +786,18 @@ class _ColorSwatch extends StatelessWidget {
 
 Future<void> showNameDialog(BuildContext context, WidgetRef ref) {
   final profile = ref.read(profileControllerProvider);
+  // Split the stable "#tag" off the editable base — the tag is a permanent
+  // unique id (re-appended by rename), so the field only edits the base and the
+  // tag is shown locked. See ProfileController.rename.
+  final hash = profile.name.indexOf('#');
+  final base = hash >= 0 ? profile.name.substring(0, hash) : profile.name;
+  final tag = hash >= 0 ? profile.name.substring(hash) : '';
   return showDialog<void>(
     context: context,
     barrierColor: const Color(0x990A0514),
     builder: (_) => _NameDialog(
-      initialName: profile.name,
+      initialName: base,
+      tag: tag,
       onSave: (name) =>
           ref.read(profileControllerProvider.notifier).rename(name),
     ),
@@ -792,9 +805,17 @@ Future<void> showNameDialog(BuildContext context, WidgetRef ref) {
 }
 
 class _NameDialog extends StatefulWidget {
-  const _NameDialog({required this.initialName, required this.onSave});
+  const _NameDialog({
+    required this.initialName,
+    required this.tag,
+    required this.onSave,
+  });
 
   final String initialName;
+
+  /// The locked "#1234" suffix shown greyed to the right of the field (empty
+  /// for the guest edge case that never reaches this dialog).
+  final String tag;
   final void Function(String name) onSave;
 
   @override
@@ -802,7 +823,7 @@ class _NameDialog extends StatefulWidget {
 }
 
 class _NameDialogState extends State<_NameDialog> {
-  static const _maxLength = 16;
+  static const _maxLength = 12;
   late final TextEditingController _controller =
       TextEditingController(text: widget.initialName);
 
@@ -847,30 +868,57 @@ class _NameDialogState extends State<_NameDialog> {
                     bottom: BorderSide(color: Candy.orange, width: 2.5),
                   ),
                 ),
-                child: TextField(
-                  controller: _controller,
-                  autofocus: true,
-                  maxLength: _maxLength,
-                  cursorColor: Candy.orangeCtaTop,
-                  cursorWidth: 2 * s,
-                  style: Candy.ui(size: 16 * s, weight: FontWeight.w800),
-                  decoration: const InputDecoration(
-                    counterText: '',
-                    border: InputBorder.none,
-                    isDense: true,
-                  ),
-                  onChanged: (_) => setState(() {}),
-                  onSubmitted: (_) => _save(),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        autofocus: true,
+                        maxLength: _maxLength,
+                        cursorColor: Candy.orangeCtaTop,
+                        cursorWidth: 2 * s,
+                        style:
+                            Candy.ui(size: 16 * s, weight: FontWeight.w800),
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          border: InputBorder.none,
+                          isDense: true,
+                        ),
+                        onChanged: (_) => setState(() {}),
+                        onSubmitted: (_) => _save(),
+                      ),
+                    ),
+                    // Locked unique tag — dimmed, not editable.
+                    if (widget.tag.isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.only(left: 8 * s),
+                        child: Text(
+                          widget.tag,
+                          style: Candy.ui(
+                            size: 16 * s,
+                            weight: FontWeight.w800,
+                            color: Colors.white.withValues(alpha: 0.35),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
             SizedBox(height: 6 * s),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text('${_controller.text.length}/$_maxLength',
-                  style: Candy.ui(
-                      size: 11 * s,
-                      color: Colors.white.withValues(alpha: 0.45))),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Your tag keeps your name unique',
+                      style: Candy.ui(
+                          size: 11 * s,
+                          color: Colors.white.withValues(alpha: 0.45))),
+                ),
+                Text('${_controller.text.length}/$_maxLength',
+                    style: Candy.ui(
+                        size: 11 * s,
+                        color: Colors.white.withValues(alpha: 0.45))),
+              ],
             ),
             SizedBox(height: 12 * s),
             CandyCtaButton(

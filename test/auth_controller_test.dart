@@ -74,9 +74,8 @@ void main() {
   Future<String?> signIn() =>
       auth().signIn(email: 'bubble@gmail.com', password: 'secret1');
 
-  test('fresh install is undecided (login screen shown)', () {
-    expect(state().decided, isFalse);
-    expect(state().isGuest, isFalse);
+  test('fresh install boots as a guest (no login gate)', () {
+    expect(state().isGuest, isTrue);
     expect(state().isSignedIn, isFalse);
   });
 
@@ -113,14 +112,14 @@ void main() {
   test('failed sign-in returns the message and changes nothing', () async {
     service.failure = const AuthFailure('Wrong email or password.');
     expect(await signIn(), 'Wrong email or password.');
-    expect(state().decided, isFalse);
+    expect(state().isSignedIn, isFalse);
   });
 
-  test('sign out returns to undecided (login screen)', () async {
+  test('sign out drops back to guest', () async {
     service.next = _acc1;
     await signIn();
     await auth().signOut();
-    expect(state().decided, isFalse);
+    expect(state().isGuest, isTrue);
     expect(state().account, isNull);
   });
 

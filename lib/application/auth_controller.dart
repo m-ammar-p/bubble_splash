@@ -4,9 +4,10 @@ import '../domain/models/auth_state.dart';
 import '../domain/services/auth_service.dart';
 import 'providers.dart';
 
-/// Owns the player's login choice (guest / account) and persists it. The login
-/// screen is shown while [AuthState.decided] is false; every choice here lands
-/// in prefs so the app boots straight to Home afterwards.
+/// Owns the player's identity (guest / account) and persists it. There is no
+/// first-launch login gate: a fresh install boots straight to Home as a guest,
+/// and signing in happens on demand (shop coin gate, profile name edit, the
+/// profile ACCOUNT card). A returning signed-in player is restored from prefs.
 ///
 /// Per-account progression hangs off this state: `profileControllerProvider`
 /// watches the signed-in account id and loads that account's profile (guests
@@ -15,7 +16,7 @@ import 'providers.dart';
 class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() =>
-      ref.read(authRepositoryProvider).load() ?? AuthState.undecided;
+      ref.read(authRepositoryProvider).load() ?? const AuthState.guest();
 
   void _commit(AuthState next) {
     state = next;
@@ -73,10 +74,10 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  /// Signs out and returns to the undecided state (login screen).
+  /// Signs out and drops back to guest (progression follows the guest slot).
   Future<void> signOut() async {
     await ref.read(authServiceProvider).signOut();
-    _commit(AuthState.undecided);
+    _commit(const AuthState.guest());
   }
 }
 

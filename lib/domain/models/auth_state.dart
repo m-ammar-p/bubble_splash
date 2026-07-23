@@ -35,33 +35,26 @@ class AuthAccount {
       );
 }
 
-/// Whether the player has passed the login screen, and as whom.
-///
-/// Three shapes: undecided (fresh install — show the login screen), guest
-/// (`decided` with no [account]), or signed in (`decided` with an [account]).
+/// The player's identity: guest (no [account]) or signed in (with an
+/// [account]). There is no login gate — a fresh install is a guest, and an
+/// account is adopted on demand from the shop/profile.
 class AuthState {
-  const AuthState({required this.decided, this.account});
-
-  /// True once the player has chosen guest or an account on the login screen.
-  final bool decided;
+  const AuthState({this.account});
 
   /// The signed-in account, or null when playing as a guest.
   final AuthAccount? account;
 
-  static const undecided = AuthState(decided: false);
-  const AuthState.guest() : this(decided: true);
-  const AuthState.signedIn(AuthAccount this.account) : decided = true;
+  const AuthState.guest() : account = null;
+  const AuthState.signedIn(AuthAccount this.account);
 
   bool get isSignedIn => account != null;
-  bool get isGuest => decided && account == null;
+  bool get isGuest => account == null;
 
   Map<String, dynamic> toMap() => {
-        'decided': decided,
         'account': account?.toMap(),
       };
 
   factory AuthState.fromMap(Map<String, dynamic> map) => AuthState(
-        decided: map['decided'] as bool,
         account: map['account'] == null
             ? null
             : AuthAccount.fromMap(map['account'] as Map<String, dynamic>),
