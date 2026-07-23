@@ -50,6 +50,7 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.4
 
 # App icon generation (run: dart run flutter_launcher_icons).
 # Source art in assets/icon/ (copied from the design handoff — do NOT re-render).
@@ -70,6 +71,24 @@ flutter_launcher_icons:
   adaptive_icon_background: "assets/icon/adaptive_background.png"
   adaptive_icon_foreground: "assets/icon/adaptive_foreground.png"
   adaptive_icon_foreground_inset: 10
+
+# OS cold-start frame (static, no animation) — covers the first launch moment
+# before the animated Flutter SplashScreen mounts. Regenerate with:
+#   dart run flutter_native_splash:create
+#
+# Deliberately NO logo: the cold-start frame is just the flat cosmos color
+# (#120830), matching the animated SplashScreen's background, so the two read as
+# a SINGLE splash (the animated bubbles/wordmark fade in on the same colour)
+# instead of "icon splash → different animated splash". On Android 12+ the OS
+# splash API forces a centered icon, so we feed it a fully transparent image
+# (assets/icon/splash_transparent.png) to suppress the logo — leaving only the
+# background colour. Legacy (<12) is color-only already.
+flutter_native_splash:
+  color: "#120830"
+  android_12:
+    color: "#120830"
+    icon_background_color: "#120830"
+    image: assets/icon/splash_transparent.png
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

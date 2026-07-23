@@ -10,15 +10,15 @@ class BubbleSplashApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // No first-launch login gate: everyone boots to Home (fresh installs as a
-    // guest, returning accounts restored from prefs). Signing in happens on
-    // demand from the shop/profile.
+    // No first-launch login gate: the animated splash boots first, then routes
+    // everyone to Home (fresh installs as a guest, returning accounts restored
+    // from prefs). Signing in happens on demand from the shop/profile.
     return MaterialApp(
       title: 'Bubble Splash',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
       navigatorKey: ref.watch(navigatorKeyProvider),
-      initialRoute: Routes.home,
+      initialRoute: Routes.splash,
       onGenerateRoute: Routes.onGenerateRoute,
     );
   }

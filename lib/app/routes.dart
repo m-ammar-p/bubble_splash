@@ -5,10 +5,12 @@ import '../presentation/screens/home_screen.dart';
 import '../presentation/screens/leaderboard_screen.dart';
 import '../presentation/screens/profile_screen.dart';
 import '../presentation/screens/shop_screen.dart';
+import '../presentation/screens/splash_screen.dart';
 
 /// Named routes. Kept centralized so navigation targets are discoverable and a
 /// future migration to go_router touches one file.
 abstract final class Routes {
+  static const splash = '/splash';
   static const home = '/';
   static const game = '/game';
   static const profile = '/profile';
@@ -17,6 +19,7 @@ abstract final class Routes {
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     final builder = switch (settings.name) {
+      splash => (_) => const SplashScreen(),
       home => (_) => const HomeScreen(),
       game => (_) => const GameScreen(),
       profile => (_) => const ProfileScreen(),
